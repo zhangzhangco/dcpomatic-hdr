@@ -42,5 +42,6 @@ test/README.aux
 compile_commands.json
 vim-lsp.log
 .cache
-
+projects/
+test_content/
 lock

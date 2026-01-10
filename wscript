@@ -372,6 +372,9 @@ def configure(conf):
     # leqm_nrt
     conf.check_cfg(package='leqm_nrt', args='--cflags --libs', uselib_store='LEQM_NRT', mandatory=True)
 
+    # sndfile (required by leqm_nrt)
+    conf.check_cfg(package='sndfile', args='--cflags --libs', uselib_store='SNDFILE', mandatory=True)
+
     # libcxml
     if conf.options.static_cxml:
         conf.check_cfg(package='libcxml', args='libcxml >= 0.17.0 --cflags', uselib_store='CXML', mandatory=True)

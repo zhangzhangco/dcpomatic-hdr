@@ -99,6 +99,10 @@ DCPVideo::DCPVideo(shared_ptr<const PlayerVideo> frame, shared_ptr<const cxml::N
 	_resolution = Resolution(node->optional_number_child<int>("Resolution").get_value_or(static_cast<int>(Resolution::TWO_K)));
 }
 
+#include "zhangxin_hdr.h"
+#include <dcp/gamma_transfer_function.h>
+#include <dcp/chromaticity.h>
+
 shared_ptr<dcp::OpenJPEGImage>
 DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
 {
@@ -110,16 +114,49 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
 
 	auto image = frame->image(conversion, VideoRange::FULL, false);
 
-	if (frame->colour_conversion()) {
-		xyz = dcp::rgb_to_xyz(
+    // [ZHANGXIN] HDR Processor Insertion Point (Step 2)
+    ZhangxinHDR::Config hdr_config;
+    
+    if (getenv("ZHANGXIN_HDR_ENABLE")) {
+        hdr_config.enable = true;
+        hdr_config.debug_mode = (getenv("ZHANGXIN_HDR_DEBUG") != nullptr);
+        hdr_config.dump_debug_frames = (getenv("ZHANGXIN_HDR_DUMP") != nullptr);
+    }
+
+    if (hdr_config.enable) {
+        // 1. 执行受限复原
+        image = ZhangxinHDR::process(image, hdr_config);
+        
+        // 2. 构造线性色彩转换
+        dcp::ColourConversion linear_cc;
+        if (frame->colour_conversion()) {
+            linear_cc = frame->colour_conversion().get();
+        } else {
+            linear_cc = dcp::ColourConversion::rec709_to_xyz();
+        }
+        
+        linear_cc.set_in(make_shared<dcp::GammaTransferFunction>(1.0));
+
+        xyz = dcp::rgb_to_xyz(
 			image->data()[0],
 			image->size(),
 			image->stride()[0],
-			frame->colour_conversion().get()
+			linear_cc
 			);
-	} else {
-		xyz = make_shared<dcp::OpenJPEGImage>(image->data()[0], image->size(), image->stride()[0]);
-	}
+
+    } else {
+        // Original Path
+        if (frame->colour_conversion()) {
+            xyz = dcp::rgb_to_xyz(
+                image->data()[0],
+                image->size(),
+                image->stride()[0],
+                frame->colour_conversion().get()
+                );
+        } else {
+            xyz = make_shared<dcp::OpenJPEGImage>(image->data()[0], image->size(), image->stride()[0]);
+        }
+    }
 
 	return xyz;
 }
