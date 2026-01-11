@@ -1,0 +1,145 @@
+diff --git a/src/cpl.cc b/src/cpl.cc
+index 2fbe373a..b960b825 100644
+--- a/src/cpl.cc
++++ b/src/cpl.cc
+@@ -395,6 +395,7 @@ CPL::read_composition_metadata_asset(cxml::ConstNodePtr node, vector<dcp::Verifi
+ 
+ 	_sign_language_video_language = extension_metadata("http://isdcf.com/2017/10/SignLanguageVideo", "Sign Language Video", "Language Tag");
+ 	_dolby_edr_image_transfer_function = extension_metadata("http://www.dolby.com/schemas/2014/EDR-Metadata", "Dolby EDR", "image transfer function");
++	_dci_hdr_eotf = extension_metadata("http://www.dcimovies.com/schemas/2018/HDR-Metadata", "Image Encoding Parameters", "EOTF");
+ 
+ 	if (node->optional_node_child("MCASubDescriptors")) {
+ 		_profile = Profile::SMPTE_BV21;
+@@ -604,6 +605,10 @@ CPL::maybe_write_composition_metadata_asset(xmlpp::Element* node) const
+ 		add_extension_metadata("http://www.dolby.com/schemas/2014/EDR-Metadata", "Dolby EDR", "image transfer function", *_dolby_edr_image_transfer_function);
+ 	}
+ 
++	if (_dci_hdr_eotf) {
++		add_extension_metadata("http://www.dcimovies.com/schemas/2018/HDR-Metadata", "Image Encoding Parameters", "EOTF", *_dci_hdr_eotf);
++	}
++
+ 	if (_reels.front()->main_sound()) {
+ 		auto asset = _reels.front()->main_sound()->asset();
+ 		if (asset && _profile == Profile::SMPTE_BV21) {
+diff --git a/src/cpl.h b/src/cpl.h
+index c7e41353..c1389966 100644
+--- a/src/cpl.h
++++ b/src/cpl.h
+@@ -338,6 +338,14 @@ public:
+ 		return _dolby_edr_image_transfer_function;
+ 	}
+ 
++	void set_dci_hdr_eotf(std::string eotf) {
++		_dci_hdr_eotf = eotf;
++	}
++
++	boost::optional<std::string> dci_hdr_eotf() const {
++		return _dci_hdr_eotf;
++	}
++
+ 	Standard standard() const {
+ 		return _standard;
+ 	}
+@@ -403,6 +411,7 @@ private:
+ 	std::vector<std::string> _additional_subtitle_languages;
+ 	boost::optional<std::string> _sign_language_video_language;
+ 	boost::optional<std::string> _dolby_edr_image_transfer_function;
++	boost::optional<std::string> _dci_hdr_eotf;
+ 	bool _read_composition_metadata = false;
+ 
+ 	std::vector<std::shared_ptr<Reel>> _reels;
+diff --git a/src/j2k_picture_asset_writer_common.cc b/src/j2k_picture_asset_writer_common.cc
+index a86da194..3c0e4c0b 100644
+--- a/src/j2k_picture_asset_writer_common.cc
++++ b/src/j2k_picture_asset_writer_common.cc
+@@ -38,6 +38,12 @@
+ 
+ 
+ #include "filesystem.h"
++#include "picture_asset.h"
++
++// [ZHANGXIN] Include asdcplib internal headers for TransferCharacteristic support
++#include <asdcp/MXF.h>
++#include <asdcp/Metadata.h>
++#include <asdcp/MDD.h>
+ 
+ 
+ using std::shared_ptr;
+@@ -91,5 +97,34 @@ void dcp::start (J2KPictureAssetWriter* writer, shared_ptr<P> state, Q* asset, u
+ 		boost::throw_exception (MXFFileError("could not open MXF file for writing", asset->file()->string(), r));
+ 	}
+ 
++	// [ZHANGXIN] Set TransferCharacteristic for HDR (ST 2084 / PQ)
++	if (asset->transfer_function() == PictureTransferFunction::ST_2084) {
++		ASDCP::MXF::InterchangeObject* obj = nullptr;
++		auto& header = state->mxf_writer.OP1aHeader();
++		const ASDCP::Dictionary* dict = &ASDCP::DefaultSMPTEDict();
++		
++		// Find GenericPictureEssenceDescriptor in the MXF header
++		r = header.GetMDObjectByType(
++			dict->ul(ASDCP::MDD_RGBAEssenceDescriptor),
++			&obj
++		);
++		if (ASDCP_FAILURE(r)) {
++			// Try CDCI descriptor (YCbCr) if RGBA not found
++			r = header.GetMDObjectByType(
++				dict->ul(ASDCP::MDD_CDCIEssenceDescriptor),
++				&obj
++			);
++		}
++		
++		if (ASDCP_SUCCESS(r) && obj) {
++			auto* desc = dynamic_cast<ASDCP::MXF::GenericPictureEssenceDescriptor*>(obj);
++			if (desc) {
++				// Set TransferCharacteristic to ST 2084 (PQ)
++				desc->TransferCharacteristic = dict->ul(ASDCP::MDD_TransferCharacteristic_SMPTEST2084);
++			}
++		}
++	}
++
+ 	writer->_started = true;
+ }
++
+diff --git a/src/picture_asset.h b/src/picture_asset.h
+index 36364485..3573f7ad 100644
+--- a/src/picture_asset.h
++++ b/src/picture_asset.h
+@@ -44,6 +44,13 @@
+ namespace dcp {
+ 
+ 
++/** Picture Transfer function for picture essence (EOTF) */
++enum class PictureTransferFunction {
++	SDR,       ///< Standard (unspecified, default DCI behavior)
++	ST_2084    ///< ST 2084 / PQ (HDR)
++};
++
++
+ class PictureAsset : public Asset, public MXF
+ {
+ public:
+@@ -82,6 +89,15 @@ public:
+ 		_screen_aspect_ratio = r;
+ 	}
+ 
++	// [ZHANGXIN] HDR Transfer Characteristic support
++	PictureTransferFunction transfer_function() const {
++		return _transfer_function;
++	}
++
++	void set_transfer_function(PictureTransferFunction tf) {
++		_transfer_function = tf;
++	}
++
+ protected:
+ 	Fraction _edit_rate;
+ 	/** The total length of this content in video frames.  The amount of
+@@ -92,6 +108,8 @@ protected:
+ 	Size _size;
+ 	Fraction _frame_rate;
+ 	Fraction _screen_aspect_ratio;
++	// [ZHANGXIN] HDR
++	PictureTransferFunction _transfer_function = PictureTransferFunction::SDR;
+ 
+ };
+ 
