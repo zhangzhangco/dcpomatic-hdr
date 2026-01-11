@@ -425,10 +425,37 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     long long sdr_deep = 0, sdr_shadow = 0, sdr_mid = 0, sdr_hi = 0;
     long long hdr_deep = 0, hdr_shadow = 0, hdr_mid = 0, hdr_hi = 0;
     
+    // Bucket Stats for Color Volume
+    struct BucketStat {
+        double sum_sat_sdr = 0;
+        double sum_sat_hdr = 0;
+        double sum_hue = 0;
+        std::vector<float> hue_list;
+        long long n = 0;
+    };
+    BucketStat buckets[4]; 
+    const char* bucket_names[4] = {"Deep", "Shadow", "Mid", "Hi"};
+    
+    auto sat01 = [](float r, float g, float b) {
+        float mx = std::max({r,g,b});
+        float mn = std::min({r,g,b});
+        float d  = mx - mn;
+        const float eps = 1e-6f;
+        return (mx > eps) ? (d / (mx + eps)) : 0.0f;
+    };
+    
+    auto bucket_idx_hdr = [](float Y) {
+        if (Y < 3.0f) return 0;       // Deep
+        if (Y < 30.0f) return 1;      // Shadow
+        if (Y < 120.0f) return 2;     // Mid
+        return 3;                     // Hi
+    };
+
     if (config.debug_mode) {
         Y_values.reserve(w * h);
         sdr_y_values_all.reserve(w * h);
         hue_values.reserve(w * h / 4);  // Estimate: ~25% pixels have significant chroma
+        for(int i=0; i<4; i++) buckets[i].hue_list.reserve(w*h/10);
     }
 
     for (int y = 0; y < h; ++y) {
@@ -473,6 +500,23 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
                      sum_chroma_sdr += d_sdr;
                      sum_chroma_hdr += d_hdr;
                      chroma_count++;
+                     
+                     // Bucket Stats Collection (New)
+                     // Re-calculate Y for bucket index (approx)
+                     float Y_now = P3_R_nit * 0.209492f + P3_G_nit * 0.721595f + P3_B_nit * 0.068913f; // P3 D65 RGB->Y
+                     int bi = bucket_idx_hdr(Y_now);
+                     
+                     float sat_sdr = sat01(sdr_r, sdr_g, sdr_b);
+                     float sat_hdr = sat01(P3_R_nit, P3_G_nit, P3_B_nit);
+                     
+                     // Using sat threshold to filter noise
+                     if (sat_sdr > 0.02f || sat_hdr > 0.02f) {
+                         buckets[bi].sum_sat_sdr += sat_sdr;
+                         buckets[bi].sum_sat_hdr += sat_hdr;
+                         buckets[bi].sum_hue += diff;
+                         buckets[bi].hue_list.push_back(diff);
+                         buckets[bi].n++;
+                     }
                  }
             }
             
@@ -563,6 +607,34 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
                   << "HDR(DD=" << (int)pct(hdr_deep) << "% Sh=" << (int)pct(hdr_shadow) 
                   << "% Mid=" << (int)pct(hdr_mid) << "% Hi=" << (int)pct(hdr_hi) << "%)"
                   << std::endl;
+                  
+        // Line 4: Vol Stats
+        auto p95 = [](std::vector<float>& v)->float{
+            if (v.empty()) return 0.0f;
+            std::sort(v.begin(), v.end());
+            return v[(size_t)(v.size() * 0.95)];
+        };
+
+        std::cout << "[Frame " << g_frame_counter << "] Vol: ";
+        for (int i=0;i<4;i++) {
+            if (buckets[i].n == 0) {
+                // std::cout << bucket_names[i] << "(n=0) ";
+                continue;
+            }
+            double as_sdr = buckets[i].sum_sat_sdr / buckets[i].n;
+            double as_hdr = buckets[i].sum_sat_hdr / buckets[i].n;
+            double ratio  = (as_sdr > 1e-6) ? (as_hdr / as_sdr) : 0.0;
+            double ah     = buckets[i].sum_hue / buckets[i].n;
+            float  h95    = p95(buckets[i].hue_list);
+            
+            std::cout << bucket_names[i]
+                      << "(n=" << buckets[i].n
+                      << " SatHDR=" << as_hdr
+                      << " Ratio=" << ratio
+                      << " Hue=" << ah << "°"
+                      << " P95=" << h95 << "°) ";
+        }
+        std::cout << std::endl;
     }
 
     return result;
