@@ -436,6 +436,9 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     BucketStat buckets[4]; 
     const char* bucket_names[4] = {"Deep", "Shadow", "Mid", "Hi"};
     
+    // Clamp Stats
+    long long clamp_neg_count = 0; // Output pixels < 0
+    
     auto sat01 = [](float r, float g, float b) {
         float mx = std::max({r,g,b});
         float mn = std::min({r,g,b});
@@ -474,9 +477,14 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
                 float sdr_b = p_plane_2[plane_idx];
                 
                 // Calculate Luminance (P3 Y approx)
-                // Weights: R=0.2095, G=0.7216, B=0.0689
-                float y_sdr = sdr_r * 0.2095f + sdr_g * 0.7216f + sdr_b * 0.0689f;
-                float y_hdr = P3_R_nit * 0.2095f + P3_G_nit * 0.7216f + P3_B_nit * 0.0689f;
+                // Weights from M_P3_XYZ (R->Y, G->Y, B->Y)
+                // 0.22897457f, 0.69173852f, 0.07928691f
+                const float Wy_R = 0.22897457f;
+                const float Wy_G = 0.69173852f;
+                const float Wy_B = 0.07928691f;
+                
+                float y_sdr = sdr_r * Wy_R + sdr_g * Wy_G + sdr_b * Wy_B;
+                float y_hdr = P3_R_nit * Wy_R + P3_G_nit * Wy_G + P3_B_nit * Wy_B;
                 
                 const float eps = 1e-4f;
                 // Only applying gain if SDR has signal to avoid amplifying noise
@@ -525,8 +533,11 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
                      chroma_count++;
                      
                      // Bucket Stats Collection (New)
-                     // Re-calculate Y for bucket index (approx)
-                     float Y_now = P3_R_nit * 0.209492f + P3_G_nit * 0.721595f + P3_B_nit * 0.068913f; // P3 D65 RGB->Y
+                     // Re-calculate Y for bucket index (Correct P3 Weights)
+                     const float Wy_R = 0.22897457f;
+                     const float Wy_G = 0.69173852f;
+                     const float Wy_B = 0.07928691f;
+                     float Y_now = P3_R_nit * Wy_R + P3_G_nit * Wy_G + P3_B_nit * Wy_B; 
                      int bi = bucket_idx_hdr(Y_now);
                      
                      float sat_sdr = sat01(sdr_r, sdr_g, sdr_b);
@@ -550,6 +561,10 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
             
             // Clamp negative values (XYZ should be non-negative for PQ)
             // NOTE: Model may produce slight negatives due to matrix math
+            if (config.debug_mode) {
+                if (X_nit < 0 || Y_nit < 0 || Z_nit < 0) clamp_neg_count++;
+            }
+            
             result.x[plane_idx] = max(0.0f, X_nit);
             result.y[plane_idx] = max(0.0f, Y_nit);
             result.z[plane_idx] = max(0.0f, Z_nit);
@@ -628,7 +643,8 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
                   << "SDR(DD=" << (int)pct(sdr_deep) << "% Sh=" << (int)pct(sdr_shadow) 
                   << "% Mid=" << (int)pct(sdr_mid) << "% Hi=" << (int)pct(sdr_hi) << "%) "
                   << "HDR(DD=" << (int)pct(hdr_deep) << "% Sh=" << (int)pct(hdr_shadow) 
-                  << "% Mid=" << (int)pct(hdr_mid) << "% Hi=" << (int)pct(hdr_hi) << "%)"
+                  << "% Mid=" << (int)pct(hdr_mid) << "% Hi=" << (int)pct(hdr_hi) << "%) "
+                  << "Negs=" << clamp_neg_count
                   << std::endl;
                   
         // Line 4: Vol Stats
