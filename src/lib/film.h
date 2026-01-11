@@ -127,6 +127,15 @@ public:
 	std::string isdcf_name(bool if_created_now) const;
 	std::string dcp_name(bool if_created_now = false) const;
 
+    // [ZHANGXIN] HDR
+    bool enable_zhangxin_hdr() const {
+        return _enable_zhangxin_hdr;
+    }
+    
+    float hdr_white_nits() const {
+        return _hdr_white_nits;
+    }
+
 	/** @return true if our state has changed since we last saved it */
 	bool dirty() const {
 		return _dirty;
@@ -440,6 +449,10 @@ public:
 	void set_luminance(boost::optional<dcp::Luminance> l = boost::none);
 	void set_audio_language(boost::optional<dcp::LanguageTag> language);
 	void set_audio_frame_rate(int rate);
+    
+    // [ZHANGXIN] HDR
+    void set_enable_zhangxin_hdr(bool e);
+    void set_hdr_white_nits(float n);
 
 	void add_ffoc_lfoc(Markers& markers) const;
 
@@ -577,6 +590,10 @@ private:
 	boost::optional<dcp::Luminance> _luminance;
 	boost::optional<dcp::LanguageTag> _audio_language;
 	int _audio_frame_rate = 48000;
+    
+    // [ZHANGXIN] HDR
+    bool _enable_zhangxin_hdr = false;
+    float _hdr_white_nits = 300.0f;
 
 	int _state_version;
 

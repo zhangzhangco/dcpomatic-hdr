@@ -661,6 +661,10 @@ Writer::finish()
 	if (film()->sign_language_video_language()) {
 		cpl->set_sign_language_video_language(*film()->sign_language_video_language());
 	}
+	// [ZHANGXIN] Set DCI HDR Metadata (Signature Safe)
+	if (film()->enable_zhangxin_hdr()) {
+		cpl->set_dci_hdr_eotf("ST 2084");
+	}
 
 	dcp::MCASoundField field;
 	if (dcpomatic::film::channel_is_mapped(film(), dcp::Channel::BSL) || dcpomatic::film::channel_is_mapped(film(), dcp::Channel::BSR)) {

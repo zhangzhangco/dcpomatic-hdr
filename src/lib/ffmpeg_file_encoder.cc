@@ -31,6 +31,7 @@
 #include "player_video.h"
 extern "C" {
 #include <libavutil/channel_layout.h>
+#include <libavutil/version.h>
 }
 #include <iostream>
 
@@ -79,12 +80,23 @@ public:
 		 * some of our tests.
 		 */
 		_codec_context->flags |= AV_CODEC_FLAG_BITEXACT;
-		if (codec_name == "aac" && channels == 16) {
-			/* The default layout for AAC with 16 channels is not valid */
-			_codec_context->ch_layout = AV_CHANNEL_LAYOUT_HEXADECAGONAL;
-		} else {
-			av_channel_layout_default(&_codec_context->ch_layout, channels);
-		}
+        if (codec_name == "aac" && channels == 16) {
+            /* The default layout for AAC with 16 channels is not valid */
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+            _codec_context->ch_layout = AV_CHANNEL_LAYOUT_HEXADECAGONAL;
+#else
+            /* No direct equivalent; fall back to default channel layout */
+            _codec_context->channel_layout = av_get_default_channel_layout(channels);
+            _codec_context->channels = channels;
+#endif
+        } else {
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+            av_channel_layout_default(&_codec_context->ch_layout, channels);
+#else
+            _codec_context->channel_layout = av_get_default_channel_layout(channels);
+            _codec_context->channels = channels;
+#endif
+        }
 
 		int r = avcodec_open2(_codec_context, _codec, 0);
 		if (r < 0) {
@@ -151,9 +163,14 @@ public:
 		auto samples = av_malloc(buffer_size);
 		DCPOMATIC_ASSERT(samples);
 
-		frame->nb_samples = size;
-		frame->format = _codec_context->sample_fmt;
-		frame->ch_layout.nb_channels = channels;
+        frame->nb_samples = size;
+        frame->format = _codec_context->sample_fmt;
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+        frame->ch_layout.nb_channels = channels;
+#else
+        frame->channels = channels;
+        frame->channel_layout = _codec_context->channel_layout;
+#endif
 		int r = avcodec_fill_audio_frame(frame, channels, _codec_context->sample_fmt, (const uint8_t *) samples, buffer_size, 0);
 		DCPOMATIC_ASSERT(r >= 0);
 

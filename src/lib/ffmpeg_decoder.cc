@@ -263,7 +263,12 @@ deinterleave_audio(AVFrame* frame)
 
 	/* XXX: can't we use swr_convert() to do the format conversion? */
 
-	int const channels = frame->ch_layout.nb_channels;
+    int const channels =
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+        frame->ch_layout.nb_channels;
+#else
+        frame->channels;
+#endif
 	int const frames = frame->nb_samples;
 	int const total_samples = frames * channels;
 	auto audio = make_shared<AudioBuffers>(channels, frames);

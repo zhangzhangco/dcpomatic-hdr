@@ -20,6 +20,8 @@
 
 #include "table_dialog.h"
 #include <boost/optional.hpp>
+#include <vector>
+#include <string>
 
 class ServerDialog : public TableDialog
 {

@@ -161,6 +161,10 @@ ReelWriter::ReelWriter(
 				_j2k_picture_asset = std::make_shared<dcp::MonoJ2KPictureAsset>(rate, standard);
 			}
 			setup(_j2k_picture_asset);
+			// [ZHANGXIN] Set HDR Transfer Characteristic (ST 2084 / PQ)
+			if (film()->enable_zhangxin_hdr()) {
+				_j2k_picture_asset->set_transfer_function(dcp::PictureTransferFunction::ST_2084);
+			}
 			picture_asset = _j2k_picture_asset;
 		} else {
 			_mpeg2_picture_asset = std::make_shared<dcp::MonoMPEG2PictureAsset>(rate);

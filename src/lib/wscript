@@ -253,6 +253,12 @@ def build(bld):
 
     obj.name = 'libdcpomatic2'
     obj.export_includes = ['..']
+    obj.includes = ['..', '../../deps/onnxruntime/include']
+    # Use absolute path for onnxruntime lib
+    onnxruntime_lib = bld.path.parent.parent.find_dir('deps/onnxruntime/lib').abspath()
+    obj.libpath = [onnxruntime_lib]
+    obj.rpath = [onnxruntime_lib]  # Also set rpath for runtime
+    obj.lib = ['onnxruntime']
     obj.uselib = """
                  AVCODEC AVUTIL AVFORMAT AVFILTER SWSCALE
                  BOOST_FILESYSTEM BOOST_THREAD BOOST_DATETIME BOOST_SIGNALS2 BOOST_REGEX

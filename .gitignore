@@ -45,3 +45,7 @@ vim-lsp.log
 projects/
 test_content/
 lock
+deps/
+test_phase2_proj/
+local_target/
+HDR_XYZ_Test_Project/
