@@ -30,6 +30,7 @@ public:
         
         // 模式开关
         bool enable = false;
+        bool hue_lock = false; // Force SDR Hue (Gain Map mode)
         bool debug_mode = false; 
         bool dump_debug_frames = false; // Dump input/output frames for analysis
         std::string dump_path = "/tmp";

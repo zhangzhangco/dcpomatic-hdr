@@ -149,6 +149,7 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
         hdr_config.enable = true;
         hdr_config.debug_mode = (getenv("ZHANGXIN_HDR_DEBUG") != nullptr);
         hdr_config.dump_debug_frames = (getenv("ZHANGXIN_HDR_DUMP") != nullptr);
+        hdr_config.hue_lock = (getenv("ZHANGXIN_HDR_HUE_LOCK") != nullptr);
         
         const char* gamma_env = getenv("ZHANGXIN_HDR_GAMMA");
         if (gamma_env) {

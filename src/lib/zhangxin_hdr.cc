@@ -465,6 +465,29 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
             float P3_G_nit = out_p1[plane_idx];
             float P3_B_nit = out_p2[plane_idx];
             
+            // === Hue Lock (Gain Map Mode) ===
+            // Forces HDR output to match SDR Hue/Saturation, using Model only for Luminance gain.
+            // Solves hue shift and temporal instability.
+            if (config.hue_lock) {
+                float sdr_r = p_plane_0[plane_idx];
+                float sdr_g = p_plane_1[plane_idx];
+                float sdr_b = p_plane_2[plane_idx];
+                
+                // Calculate Luminance (P3 Y approx)
+                // Weights: R=0.2095, G=0.7216, B=0.0689
+                float y_sdr = sdr_r * 0.2095f + sdr_g * 0.7216f + sdr_b * 0.0689f;
+                float y_hdr = P3_R_nit * 0.2095f + P3_G_nit * 0.7216f + P3_B_nit * 0.0689f;
+                
+                const float eps = 1e-4f;
+                // Only applying gain if SDR has signal to avoid amplifying noise
+                if (y_sdr > eps) {
+                    float gain = y_hdr / y_sdr;
+                    P3_R_nit = sdr_r * gain;
+                    P3_G_nit = sdr_g * gain;
+                    P3_B_nit = sdr_b * gain;
+                }
+            }
+            
             if (config.debug_mode) {
                  float sdr_r = p_plane_0[plane_idx];
                  float sdr_g = p_plane_1[plane_idx];
