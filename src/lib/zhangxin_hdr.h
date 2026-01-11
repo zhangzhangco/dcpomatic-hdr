@@ -12,10 +12,17 @@
 class ZhangxinHDR
 {
 public:
+    enum class TransferFunction {
+        REC709_INV_OETF, // Default: Safe for TV/Web sources (BT.1886)
+        GAMMA_24,        // Pure Gamma 2.4
+        GAMMA_26         // DCI Cinema Gamma 2.6
+    };
+
     struct Config {
         // SDR 物理定义
         double sdr_white_nits = 48.0;
-        double sdr_gamma = 2.4;
+        TransferFunction transfer_function = TransferFunction::REC709_INV_OETF; 
+        double sdr_gamma = 2.4; // Legacy fallback
 
         // HDR 目标定义
         double hdr_black_nits = 0.005; // DCI HDR min black (cd/m²)

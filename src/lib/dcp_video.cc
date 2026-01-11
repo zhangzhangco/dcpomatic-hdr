@@ -149,6 +149,14 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
         hdr_config.enable = true;
         hdr_config.debug_mode = (getenv("ZHANGXIN_HDR_DEBUG") != nullptr);
         hdr_config.dump_debug_frames = (getenv("ZHANGXIN_HDR_DUMP") != nullptr);
+        
+        const char* gamma_env = getenv("ZHANGXIN_HDR_GAMMA");
+        if (gamma_env) {
+            std::string g(gamma_env);
+            if (g == "2.6") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_26;
+            else if (g == "2.4") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_24;
+            // Default assumes REC709_INV_OETF
+        }
     }
 
     if (hdr_config.enable) {

@@ -60,6 +60,24 @@ static void init_ort_session() {
     }
 }
 
+static float decode_transfer(float v, ZhangxinHDR::TransferFunction tf) {
+    if (v <= 0.0f) return 0.0f;
+    switch (tf) {
+        case ZhangxinHDR::TransferFunction::REC709_INV_OETF:
+            // Rec.709 inverse OETF (Scene Linear approx)
+            // V < 0.08124286 -> L = V / 4.5
+            // V >= 0.08124286 -> L = ((V + 0.099) / 1.099) ^ (1/0.45)
+            if (v < 0.08124286f) return v / 4.5f;
+            else return std::pow((v + 0.099f) / 1.099f, 2.222222f); 
+        case ZhangxinHDR::TransferFunction::GAMMA_24:
+            return std::pow(v, 2.4f);
+        case ZhangxinHDR::TransferFunction::GAMMA_26:
+            return std::pow(v, 2.6f);
+        default:
+            return std::pow(v, 2.4f);
+    }
+}
+
 // === Color Matrices ===
 static const float M_RGB_XYZ[9] = {
     0.4124564f, 0.3575761f, 0.1804375f,
@@ -301,10 +319,10 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     for (int y = 0; y < h; ++y) {
         uint16_t* p_in = reinterpret_cast<uint16_t*>(in_data + y * stride);
         for (int x = 0; x < w; ++x) {
-            // SDR Gamma 2.4 -> Linear RGB
-            float r = pow(p_in[0] / i_max, config.sdr_gamma);
-            float g = pow(p_in[1] / i_max, config.sdr_gamma);
-            float b = pow(p_in[2] / i_max, config.sdr_gamma);
+            // SDR Transfer Function -> Linear RGB
+            float r = decode_transfer(p_in[0] / i_max, config.transfer_function);
+            float g = decode_transfer(p_in[1] / i_max, config.transfer_function);
+            float b = decode_transfer(p_in[2] / i_max, config.transfer_function);
             
             // RGB -> XYZ (Relative)
             float X = r * M_RGB_XYZ[0] + g * M_RGB_XYZ[1] + b * M_RGB_XYZ[2];
@@ -337,7 +355,10 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
         }
     }
 
-    // Identify SDR Stats
+    // Identify SDR Stats (printed before inference for real-time feedback)
+    static long long g_sdr_frame_counter = 0;
+    g_sdr_frame_counter++;
+    
     if (config.debug_mode && !sdr_y_values.empty()) {
         std::sort(sdr_y_values.begin(), sdr_y_values.end());
         float min_y = sdr_y_values.front();
@@ -345,11 +366,9 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
         float median = sdr_y_values[sdr_y_values.size() / 2];
         float p99 = sdr_y_values[(size_t)(sdr_y_values.size() * 0.99)];
 
-        std::cout << "[ZHANGXIN_HDR] Input SDR Stats (Nits): "
-                  << "Y_min=" << min_y
-                  << " Y_median=" << median
-                  << " Y_p99=" << p99
-                  << " Y_max=" << max_y << std::endl;
+        std::cout << "[Frame " << g_sdr_frame_counter << "] "
+                  << "SDR(med=" << median << " p99=" << p99 << " max=" << max_y << " nits)"
+                  << std::endl;
     }
 
     // === Run ONNX Inference ===
@@ -372,9 +391,29 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     const float* out_p2 = floatarr + 2 * w * h; // P3 B
 
     // For debug stats
+    static long long g_frame_counter = 0;
+    g_frame_counter++;
+    
     std::vector<float> Y_values;
+    std::vector<float> sdr_y_values_all;  // For SDR stats
+    std::vector<float> hue_values;        // For P95 calculation
+    double sum_hue_shift = 0;
+    long long hue_count = 0;
+    
+    // Chroma stats
+    double sum_chroma_sdr = 0, sum_chroma_hdr = 0;
+    long long chroma_count = 0;
+    
+    // Luminance distribution (Cinema Semantic Zones)
+    // SDR: DeepDark(<0.5), Shadows(0.5-5), Midtones(5-20), Highlights(20-48)
+    // HDR: DeepDark(<3), Shadows(3-30), Midtones(30-120), Highlights(120-300)
+    long long sdr_deep = 0, sdr_shadow = 0, sdr_mid = 0, sdr_hi = 0;
+    long long hdr_deep = 0, hdr_shadow = 0, hdr_mid = 0, hdr_hi = 0;
+    
     if (config.debug_mode) {
         Y_values.reserve(w * h);
+        sdr_y_values_all.reserve(w * h);
+        hue_values.reserve(w * h / 4);  // Estimate: ~25% pixels have significant chroma
     }
 
     for (int y = 0; y < h; ++y) {
@@ -383,6 +422,44 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
             float P3_R_nit = out_p0[plane_idx];
             float P3_G_nit = out_p1[plane_idx];
             float P3_B_nit = out_p2[plane_idx];
+            
+            if (config.debug_mode) {
+                 float sdr_r = p_plane_0[plane_idx];
+                 float sdr_g = p_plane_1[plane_idx];
+                 float sdr_b = p_plane_2[plane_idx];
+                 
+                 // Inline Hue Calculation (P3 RGB)
+                 float mn_sdr = min({sdr_r, sdr_g, sdr_b});
+                 float mx_sdr = max({sdr_r, sdr_g, sdr_b});
+                 float d_sdr = mx_sdr - mn_sdr;
+                 
+                 float mn_hdr = min({P3_R_nit, P3_G_nit, P3_B_nit});
+                 float mx_hdr = max({P3_R_nit, P3_G_nit, P3_B_nit});
+                 float d_hdr = mx_hdr - mn_hdr;
+
+                 if (d_sdr > 1.0f && d_hdr > 1.0f) { // Threshold: 1.0 nit to filter low-saturation noise
+                     auto calc_h = [](float r, float g, float b, float mx, float d) {
+                        float h = 0;
+                        if (mx == r) h = (g - b) / d + (g < b ? 6 : 0);
+                        else if (mx == g) h = (b - r) / d + 2;
+                        else h = (r - g) / d + 4;
+                        return h * 60.0f;
+                     };
+                     float h_sdr = calc_h(sdr_r, sdr_g, sdr_b, mx_sdr, d_sdr);
+                     float h_hdr = calc_h(P3_R_nit, P3_G_nit, P3_B_nit, mx_hdr, d_hdr);
+                     float diff = abs(h_sdr - h_hdr);
+                     if (diff > 180.0f) diff = 360.0f - diff;
+                     
+                     sum_hue_shift += diff;
+                     hue_values.push_back(diff);
+                     hue_count++;
+                     
+                     // Chroma: use d (max-min) as proxy
+                     sum_chroma_sdr += d_sdr;
+                     sum_chroma_hdr += d_hdr;
+                     chroma_count++;
+                 }
+            }
             
             // P3 Nits -> XYZ Nits (Absolute luminance in cd/m²)
             float X_nit = P3_R_nit * M_P3_XYZ[0] + P3_G_nit * M_P3_XYZ[1] + P3_B_nit * M_P3_XYZ[2];
@@ -397,6 +474,25 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
             
             if (config.debug_mode) {
                 Y_values.push_back(max(0.0f, Y_nit));
+                
+                // SDR luminance bins (use sdr_y from input tensor if available)
+                // Actually we need SDR Y - let's compute it here
+                float sdr_r = p_plane_0[plane_idx];
+                float sdr_g = p_plane_1[plane_idx];
+                float sdr_b = p_plane_2[plane_idx];
+                float sdr_y = sdr_r * M_P3_XYZ[3] + sdr_g * M_P3_XYZ[4] + sdr_b * M_P3_XYZ[5];
+                
+                // SDR bins (Cinema Semantic)
+                if (sdr_y < 0.5f) sdr_deep++;
+                else if (sdr_y < 5.0f) sdr_shadow++;
+                else if (sdr_y < 20.0f) sdr_mid++;
+                else sdr_hi++;
+                
+                // HDR bins (Cinema Semantic)
+                if (Y_nit < 3.0f) hdr_deep++;
+                else if (Y_nit < 30.0f) hdr_shadow++;
+                else if (Y_nit < 120.0f) hdr_mid++;
+                else hdr_hi++;
             }
         }
     }
@@ -409,11 +505,49 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
         result.Y_median = Y_values[Y_values.size() / 2];
         result.Y_p99 = Y_values[(size_t)(Y_values.size() * 0.99)];
         
-        std::cout << "[ZHANGXIN_HDR] HDR XYZ Stats (Nits): "
-                  << "Y_min=" << result.Y_min 
-                  << " Y_median=" << result.Y_median
-                  << " Y_p99=" << result.Y_p99
-                  << " Y_max=" << result.Y_max << std::endl;
+        // Compute SDR stats from sdr_y_values (we need to collect them - simplified here using bins)
+        // For SDR, we'll just use the already-collected sdr_y_values from Input SDR Stats (printed earlier)
+        
+        // Hue P95
+        float hue_p95 = 0;
+        float hue_mean = 0;
+        if (!hue_values.empty()) {
+            std::sort(hue_values.begin(), hue_values.end());
+            hue_p95 = hue_values[(size_t)(hue_values.size() * 0.95)];
+            hue_mean = sum_hue_shift / hue_count;
+        }
+        
+        // Chroma ratio
+        double chroma_ratio = 1.0;
+        if (chroma_count > 0 && sum_chroma_sdr > 0.01) {
+            chroma_ratio = sum_chroma_hdr / sum_chroma_sdr;
+        }
+        
+        // Luminance distribution percentages
+        long long total = w * h;
+        auto pct = [total](long long n) { return 100.0 * n / total; };
+        
+        // Line 1: Luminance stats
+        std::cout << "[Frame " << g_frame_counter << "] "
+                  << "HDR(med=" << result.Y_median 
+                  << " p99=" << result.Y_p99 
+                  << " max=" << result.Y_max << " nits)"
+                  << std::endl;
+        
+        // Line 2: Color quality stats
+        std::cout << "[Frame " << g_frame_counter << "] "
+                  << "Hue(mean=" << hue_mean << "° p95=" << hue_p95 << "°) "
+                  << "Chroma(×" << chroma_ratio << ") "
+                  << "ValidPx=" << hue_count
+                  << std::endl;
+        
+        // Line 3: Distribution
+        std::cout << "[Frame " << g_frame_counter << "] "
+                  << "SDR(DD=" << (int)pct(sdr_deep) << "% Sh=" << (int)pct(sdr_shadow) 
+                  << "% Mid=" << (int)pct(sdr_mid) << "% Hi=" << (int)pct(sdr_hi) << "%) "
+                  << "HDR(DD=" << (int)pct(hdr_deep) << "% Sh=" << (int)pct(hdr_shadow) 
+                  << "% Mid=" << (int)pct(hdr_mid) << "% Hi=" << (int)pct(hdr_hi) << "%)"
+                  << std::endl;
     }
 
     return result;
