@@ -170,10 +170,6 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
         int* y_data = xyz->data(1);  // Y component
         int* z_data = xyz->data(2);  // Z component
         
-        // Debug stats for PQ domain
-        int pq_min = 4095, pq_max = 0;
-        long long pq_sum = 0;
-        
         // 3. PQ Encode all XYZ components (not just Y!)
         int pixel_count = hdr_xyz.width * hdr_xyz.height;
         for (int i = 0; i < pixel_count; ++i) {
@@ -185,21 +181,6 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
             x_data[i] = pq_x;
             y_data[i] = pq_y;
             z_data[i] = pq_z;
-            
-            // Track Y stats (primary luminance indicator)
-            pq_min = std::min(pq_min, pq_y);
-            pq_max = std::max(pq_max, pq_y);
-            pq_sum += pq_y;
-        }
-        
-        if (hdr_config.debug_mode) {
-            float pq_mean = static_cast<float>(pq_sum) / pixel_count;
-            LOG_DEBUG_ENCODE("[ZHANGXIN_HDR] PQ Stats (12-bit): Y_min={} Y_mean={:.1f} Y_max={}", 
-                             pq_min, pq_mean, pq_max);
-            std::cout << "[ZHANGXIN_HDR] PQ Stats (12-bit): "
-                      << "Y_min=" << pq_min 
-                      << " Y_mean=" << pq_mean
-                      << " Y_max=" << pq_max << std::endl;
         }
         
         return xyz;

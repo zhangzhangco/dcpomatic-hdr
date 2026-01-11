@@ -288,6 +288,12 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     size_t input_tensor_size = w * h * 3;
     std::vector<float> input_tensor_values(input_tensor_size);
     
+    // For Debug Stats (SDR Input)
+    std::vector<float> sdr_y_values;
+    if (config.debug_mode) {
+        sdr_y_values.reserve(w * h);
+    }
+    
     float* p_plane_0 = input_tensor_values.data();
     float* p_plane_1 = input_tensor_values.data() + w * h;
     float* p_plane_2 = input_tensor_values.data() + 2 * w * h;
@@ -315,6 +321,12 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
             float P3_G_nit = P3_G * 48.0f;
             float P3_B_nit = P3_B * 48.0f;
             
+            if (config.debug_mode) {
+                // Calculate SDR Y (Nits) for stats
+                float Y_sdr = P3_R_nit * M_P3_XYZ[3] + P3_G_nit * M_P3_XYZ[4] + P3_B_nit * M_P3_XYZ[5];
+                sdr_y_values.push_back(Y_sdr);
+            }
+            
             // Write to NCHW Tensor
             int plane_idx = y * w + x;
             p_plane_0[plane_idx] = P3_R_nit;
@@ -323,6 +335,21 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
 
             p_in += 3;
         }
+    }
+
+    // Identify SDR Stats
+    if (config.debug_mode && !sdr_y_values.empty()) {
+        std::sort(sdr_y_values.begin(), sdr_y_values.end());
+        float min_y = sdr_y_values.front();
+        float max_y = sdr_y_values.back();
+        float median = sdr_y_values[sdr_y_values.size() / 2];
+        float p99 = sdr_y_values[(size_t)(sdr_y_values.size() * 0.99)];
+
+        std::cout << "[ZHANGXIN_HDR] Input SDR Stats (Nits): "
+                  << "Y_min=" << min_y
+                  << " Y_median=" << median
+                  << " Y_p99=" << p99
+                  << " Y_max=" << max_y << std::endl;
     }
 
     // === Run ONNX Inference ===
