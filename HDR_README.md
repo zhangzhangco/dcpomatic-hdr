@@ -22,7 +22,18 @@ We have enhanced DCP-o-matic with a new processing pipeline that:
 
 ## Usage
 
-### 1. Environment Setup
+### 1. Build Requirements & Patching
+
+Before building, you **MUST** patch the local `libdcp` dependency to enable HDR metadata support.
+
+```bash
+cd deps/libdcp
+git apply ../../libdcp_hdr_integration.patch
+cd ../..
+# Then proceed with ./waf configure && ./waf build
+```
+
+### 2. Environment Setup
 
 The HDR pipeline is controlled via environment variables.
 
