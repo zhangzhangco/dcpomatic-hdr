@@ -13,9 +13,9 @@ class ZhangxinHDR
 {
 public:
     enum class TransferFunction {
-        REC709_INV_OETF, // Default: Safe for TV/Web sources (BT.1886)
-        GAMMA_24,        // Pure Gamma 2.4
-        GAMMA_26         // DCI Cinema Gamma 2.6
+        REC709_SCENE_LINEAR, // Inverse OETF (Scene Linear), NOT for display reference
+        GAMMA_24,            // Gamma 2.4 (Approximates BT.1886 display reference)
+        GAMMA_26             // DCI Cinema Gamma 2.6
     };
 
     struct Config {

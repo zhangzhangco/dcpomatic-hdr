@@ -61,11 +61,12 @@ static void init_ort_session() {
 }
 
 static float decode_transfer(float v, ZhangxinHDR::TransferFunction tf) {
-    if (v <= 0.0f) return 0.0f;
-    v = std::min(v, 1.0f); // Clamp input
+    // Anti-NaN clipping in encoding domain.
+    // NOTE: We clip negative values here for safety.
+    v = std::max(0.0f, std::min(v, 1.0f));
     
     switch (tf) {
-        case ZhangxinHDR::TransferFunction::REC709_INV_OETF: {
+        case ZhangxinHDR::TransferFunction::REC709_SCENE_LINEAR: {
             // Rec.709 inverse OETF (Scene Linear)
             // L = V/4.5                   if V < 0.081
             // L = ((V+0.099)/1.099)^(1/0.45) otherwise
@@ -157,6 +158,10 @@ ZhangxinHDR::process(shared_ptr<const Image> image, Config config)
     uint8_t* out_data = out->data()[0];
     int stride = image->stride()[0];
     const float i_max = 65535.0f;
+
+    // === Preview Generation (NOT for Mastering) ===
+    // This path scales HDR Nits back to 0-1 range for simple visualization.
+    // Do not use this output for DCP creation.
 
     // Allocate Input Tensor (NCHW, 1x3xHxW)
     size_t input_tensor_size = w * h * 3;
