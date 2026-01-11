@@ -21,7 +21,7 @@ public:
     struct Config {
         // SDR 物理定义
         double sdr_white_nits = 48.0;
-        TransferFunction transfer_function = TransferFunction::REC709_INV_OETF; 
+        TransferFunction transfer_function = TransferFunction::GAMMA_24; // Default: BT.1886 
         double sdr_gamma = 2.4; // Legacy fallback
 
         // HDR 目标定义

@@ -155,7 +155,8 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
             std::string g(gamma_env);
             if (g == "2.6") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_26;
             else if (g == "2.4") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_24;
-            // Default assumes REC709_INV_OETF
+            else if (g == "REC709") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::REC709_INV_OETF;
+            // Default GAMMA_24 from Config constructor
         }
     }
 

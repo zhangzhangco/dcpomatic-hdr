@@ -62,13 +62,23 @@ static void init_ort_session() {
 
 static float decode_transfer(float v, ZhangxinHDR::TransferFunction tf) {
     if (v <= 0.0f) return 0.0f;
+    v = std::min(v, 1.0f); // Clamp input
+    
     switch (tf) {
-        case ZhangxinHDR::TransferFunction::REC709_INV_OETF:
-            // Rec.709 inverse OETF (Scene Linear approx)
-            // V < 0.08124286 -> L = V / 4.5
-            // V >= 0.08124286 -> L = ((V + 0.099) / 1.099) ^ (1/0.45)
-            if (v < 0.08124286f) return v / 4.5f;
-            else return std::pow((v + 0.099f) / 1.099f, 2.222222f); 
+        case ZhangxinHDR::TransferFunction::REC709_INV_OETF: {
+            // Rec.709 inverse OETF (Scene Linear)
+            // L = V/4.5                   if V < 0.081
+            // L = ((V+0.099)/1.099)^(1/0.45) otherwise
+            const float k = 4.5f;
+            const float t = 0.018f;        // Knee at 0.018 linear
+            const float Vt = k * t;        // Knee at ~0.081 encoded
+            const float a = 0.099f;
+            const float b = 1.099f;
+            const float gamma = 1.0f / 0.45f; // ~2.222
+            
+            if (v < Vt) return v / k;
+            else return std::pow((v + a) / b, gamma); 
+        }
         case ZhangxinHDR::TransferFunction::GAMMA_24:
             return std::pow(v, 2.4f);
         case ZhangxinHDR::TransferFunction::GAMMA_26:
@@ -166,9 +176,9 @@ ZhangxinHDR::process(shared_ptr<const Image> image, Config config)
         uint16_t* p_in = reinterpret_cast<uint16_t*>(in_data + y * stride);
         for (int x = 0; x < w; ++x) {
             // SDR -> Linear RGB
-            float r = pow(p_in[0] / i_max, config.sdr_gamma);
-            float g = pow(p_in[1] / i_max, config.sdr_gamma);
-            float b = pow(p_in[2] / i_max, config.sdr_gamma);
+            float r = decode_transfer(p_in[0] / i_max, config.transfer_function);
+            float g = decode_transfer(p_in[1] / i_max, config.transfer_function);
+            float b = decode_transfer(p_in[2] / i_max, config.transfer_function);
             
             // RGB -> XYZ
             float X = r * M_RGB_XYZ[0] + g * M_RGB_XYZ[1] + b * M_RGB_XYZ[2];
