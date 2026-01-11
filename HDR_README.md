@@ -1,104 +1,91 @@
-# DCP-o-matic HDR Integration
+# DCP-o-matic SDR-to-HDR Neural Pipeline
 
-This document outlines the custom integration of a Neural Network-based SDR-to-HDR upscaling pipeline into DCP-o-matic, enabling the creation of DCI-compliant HDR DCPs.
+Integration of a neural network-based SDR-to-HDR upscaling pipeline into DCP-o-matic, enabling the creation of DCI-compliant HDR DCPs (PQ, ST 2084).
 
-## Overview
+## 🚀 Quick Start
 
-We have enhanced DCP-o-matic with a new processing pipeline that:
-1.  **Intercepts** standard SDR video frames during the encoding process.
-2.  **Upscales** them to HDR (targeting 300 nits peak luminance) using an ONNX-based neural network model.
-3.  **Encodes** the result using the PQ (Perceptual Quantizer) curve (ST 2084).
-4.  **Signals** the content as HDR in both the MXF and CPL metadata, ensuring compatibility with DCI HDR-capable cinema servers.
+To encode an HDR DCP from an SDR source:
 
-## Features
+```bash
+# 1. Set Local Library Path (Critical for Linux)
+export LD_LIBRARY_PATH=$(pwd)/build/src/lib:$(pwd)/build/src/wx:$(pwd)/local_target/lib:$(pwd)/deps/onnxruntime/lib:$LD_LIBRARY_PATH
 
-*   **ONNX Runtime Integration**: Loads and runs custom `.onnx` models for frame-by-frame inference.
-*   **Strict Validation**: Requires a valid ONNX model path. If missing, the encoding process will terminate with an error to prevent invalid output.
-*   **DCI Compliance**:
-    *   **CPL Metadata**: Injects `<ExtensionMetadata>` with `EOTF=ST 2084` into the CPL.
-    *   **MXF Metadata**: Sets the correct Transfer Characteristic UL (ST 2084) in the Picture Essence Descriptor.
-    *   **Digital Signature**: All metadata is injected *before* signing, ensuring passing validation (Clairmeta check: Success).
-*   **Performance Monitoring**: Logs real-time pixel statistics (Nit levels, PQ code values) for verification.
+# 2. Enable HDR Pipeline
+export ZHANGXIN_HDR_ENABLE=1
 
-## Usage
+# 3. Point to your ONNX Model
+export ZHANGXIN_HDR_MODEL="/home/zhangxin/models/v6_latest.onnx"
 
-### 1. Build Requirements & Patching
+# 4. (Optional) Set Input Transfer Function. 
+#    Default is 2.4 (Safe for most cases). 
+#    Only change if you know your source is DCI-graded (2.6) or Scene Linear (REC709).
+# export ZHANGXIN_HDR_GAMMA=2.6 
 
-Before building, you **MUST** patch the local `libdcp` dependency to enable HDR metadata support.
+# 5. Run DCP-o-matic CLI (Single threaded recommended for inference stability)
+./build/src/tools/dcpomatic2_create -o MyHDRProject input.mov
+./build/src/tools/dcpomatic2_cli -t 1 MyHDRProject
+```
+
+## ⚙️ Configuration (Environment Variables)
+
+The pipeline is entirely controlled via environment variables.
+
+| Variable | Values | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `ZHANGXIN_HDR_ENABLE` | `1` | Unset | **Required**. Activates the HDR processing. If unset, runs standard SDR pipeline. |
+| `ZHANGXIN_HDR_MODEL` | File Path | Unset | **Required**. Path to the `.onnx` model file. Process aborts if missing. |
+| `ZHANGXIN_HDR_GAMMA` | `2.4`, `2.6`, `REC709` | `2.4` | **Critical**. Defines how the SDR input RGB values are decoded before entering the neural network. See guide below. |
+| `ZHANGXIN_HDR_DEBUG` | `1` | Unset | Detailed per-frame logs (Luminance stats, Hue shift, Semantics). |
+| `ZHANGXIN_HDR_DUMP` | `1` | Unset | Dumps intermediate frames to `/tmp` for visual debugging. |
+
+### 🎨 Transfer Function Guide (Input Gamma)
+
+Choosing the correct `ZHANGXIN_HDR_GAMMA` is vital for correct brightness and shadow detail.
+
+*   **`2.4` (Default, Recommended)**
+    *   **Logic**: Pure Power 2.4. Approximates BT.1886 display reference.
+    *   **Use Case**: Most mixed sources, ProRes masters, HD TV/Web content. 
+    *   **Effect**: Balanced brightness. Prevents crushed shadows. Safest engineering choice.
+
+*   **`2.6` (Cinema Mode)**
+    *   **Logic**: Pure Power 2.6 (DCI Gamma).
+    *   **Use Case**: Inputs that are strictly graded for DCI Cinema (dark rooms).
+    *   **Effect**: Darker shadows. If used on Rec.709 content, it will crush shadow details into black.
+
+*   **`REC709` (Scene Linear)**
+    *   **Logic**: Rec.709 Inverse OETF (contains a linear segment near black).
+    *   **Use Case**: Camera original footage or "Scene Linear" workflows.
+    *   **Effect**: Lifts shadows significantly. Can be used if the default 2.4 feels too dark.
+
+## 📊 Debugging & Interpretation
+
+When `ZHANGXIN_HDR_DEBUG=1` is set, the CLI outputs frame statistics:
+
+```text
+[Frame 101] HDR(med=7.5 p99=10.5 max=105 nits)
+[Frame 101] Hue(mean=3.1° p95=6.2°) Chroma(×1.9) ValidPx=1540624
+[Frame 101] SDR(DD=28% Sh=70% Mid=1% Hi=0%) HDR(DD=28% Sh=71% Mid=0% Hi=0%)
+```
+
+*   **Hue (p95)**: 95th percentile hue shift. Should ideally be < 5°. High values indicate color skew.
+*   **Chroma (x1.9)**: Ratio of HDR saturation to SDR saturation.
+*   **Cinema Semantic Zones**:
+    *   **DeepDark (DD)**: Black level floor.
+    *   **Shadow (Sh)**: Textures and dark details.
+    *   **Mid / Hi**: Midtones and Highlights.
+    *   *Check*: If `SDR DD` is very high (>80%), your input might be crushed (try checking Gamma settings).
+
+## 🛠️ Build & Patching
+
+Requires `libdcp` patching for metadata support.
 
 ```bash
 cd deps/libdcp
 git apply ../../libdcp_hdr_integration.patch
-cd ../..
-# Then proceed with ./waf configure && ./waf build
+# Rebuild dcpomatic:
+# ./waf configure && ./waf build -j4
 ```
-
-### 2. Environment Setup
-
-The HDR pipeline is controlled via environment variables.
-
-| Variable | Value | Description |
-| :--- | :--- | :--- |
-| `ZHANGXIN_HDR_ENABLE` | `1` | **Required.** Activates the HDR processing path. If unset, DCP-o-matic behaves normally (SDR behavior). |
-| `ZHANGXIN_HDR_MODEL` | `/path/to/model.onnx` | **Required.** Path to your trained ONNX model. If unset or invalid, the process will **FAIL**. |
-| `ZHANGXIN_HDR_DEBUG` | `1` | Optional. Enables detailed per-frame statistics logging (min/max nits, histogram) to stdout. |
-| `LD_LIBRARY_PATH` | `...` | **Required.** Must include: `build/src/lib`, `local_target/lib`, and `deps/onnxruntime/lib`. |
-
-### 2. Making an HDR DCP (CLI Example)
-
-You can use the standard DCP-o-matic CLI tools. No changes to CLI arguments are needed; simply set the environment variables.
-
-```bash
-# Set up environment
-export ZHANGXIN_HDR_ENABLE=1
-export ZHANGXIN_HDR_MODEL="/home/zhangxin/models/v6_latest.onnx"
-# export ZHANGXIN_HDR_DEBUG=1  # Uncomment for pixel stats
-
-# CRITICAL: Point to local libraries
-export LD_LIBRARY_PATH=$(pwd)/build/src/lib:$(pwd)/build/src/wx:$(pwd)/local_target/lib:$(pwd)/deps/onnxruntime/lib:$LD_LIBRARY_PATH
-
-# 1. Create the project
-./build/src/tools/dcpomatic2_create \
-  -o My_HDR_Project \
-  --name "My HDR Movie" \
-  input_video.mp4
-
-# 2. Transcode (Make DCP)
-# IMPORTANT: Use -t 1 (single thread) to ensure stable inference without OOM.
-./build/src/tools/dcpomatic2_cli -t 1 My_HDR_Project
-```
-
-### 3. Verification
-
-To verify the generated DCP is correctly signaled as HDR:
-
-**Using Clairmeta (Recommended):**
-```bash
-python3 -m clairmeta.cli probe -type dcp My_HDR_Project/My_HDR_Movie_..._OV
-# Check output for:
-# - Transfer Characteristic in MXF (should indicate ST 2084 / PQ)
-# - ExtensionMetadata in CPL (should present EOTF: ST 2084)
-```
-
-**Using asdcp_info (Low-level):**
-```bash
-# Check Picture MXF
-asdcp-info -H My_HDR_Project/.../j2c_....mxf | grep "TransferCharacteristic"
-# Should output UL ending in: ...04.01.01.01.01.0A.00.00 (ST 2084)
-```
-
-## System Integration Summary
-
-This integration modifies the core `dcpomatic` and `libdcp` libraries to strictly enforce DCI HDR compliance:
-
-1.  **Frame Processing**: Intercepts video frames in `dcp_video.cc` and routes them through the ONNX model (`zhangxin_hdr.cc`).
-2.  **Metadata Injection**: 
-    *   **MXF**: Patched `libdcp` writes SMPTE ST 2084 Universal Labels.
-    *   **CPL**: `writer.cc` injects `<ExtensionMetadata>` before digital signing.
-3.  **Validation**: All logic is hard-coded to fail-safe (abort) if model loading fails, preventing accidental SDR leakage.
-
-
 
 ---
 **Author**: zhangxin
-**Date**: 2026-01-11
+**Last Updated**: 2026-01-11 (v2.0 Transfer Function Update)
