@@ -195,11 +195,6 @@ Film::Film(optional<boost::filesystem::path> dir)
 	, _state_version(current_state_version)
 	, _dirty(false)
 {
-    // [ZHANGXIN] Debug Hack
-    if (getenv("ZHANGXIN_HDR_ENABLE")) {
-        _enable_zhangxin_hdr = true;
-    }
-
 	set_isdcf_date_today();
 
 	auto metadata = Config::instance()->default_metadata();

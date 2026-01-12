@@ -4,6 +4,7 @@
 
 #include "zhangxin_hdr.h"
 #include "dcpomatic_assert.h"
+#include "config.h"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
@@ -34,13 +35,12 @@ struct OrtContext {
 static std::unique_ptr<OrtContext> g_ort_ctx;
 static std::mutex g_ort_mutex;
 
-static void init_ort_session() {
+static void init_ort_session(const std::string& model_path) {
     std::lock_guard<std::mutex> lock(g_ort_mutex);
     if (g_ort_ctx && g_ort_ctx->session) return; // Already initialized
 
-    const char* model_path = getenv("ZHANGXIN_HDR_MODEL");
-    if (!model_path) {
-        std::cerr << "[ZHANGXIN_HDR] Error: ZHANGXIN_HDR_MODEL environment variable not set!" << std::endl;
+    if (model_path.empty()) {
+        std::cerr << "[ZHANGXIN_HDR] Error: Model path is empty!" << std::endl;
         return;
     }
 
@@ -52,7 +52,7 @@ static void init_ort_session() {
         session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
         std::cout << "[ZHANGXIN_HDR] Loading ONNX model from " << model_path << " ..." << std::endl;
-        g_ort_ctx->session.reset(new Ort::Session(g_ort_ctx->env, model_path, session_options));
+        g_ort_ctx->session.reset(new Ort::Session(g_ort_ctx->env, model_path.c_str(), session_options));
         std::cout << "[ZHANGXIN_HDR] Model loaded successfully." << std::endl;
     } catch (const Ort::Exception& e) {
         std::cerr << "[ZHANGXIN_HDR] ORT Exception: " << e.what() << std::endl;
@@ -131,6 +131,34 @@ ZhangxinHDR::log_stats(const string& tag, const Stats& s) {
     }
 }
 
+ZhangxinHDR::Config
+ZhangxinHDR::Config::load_from_config()
+{
+    Config c;
+    
+    auto global_config = ::Config::instance();
+    
+    if (global_config->zhangxin_hdr_enable()) {
+        c.enable = *global_config->zhangxin_hdr_enable();
+    }
+    
+    if (global_config->zhangxin_hdr_model_path()) {
+        c.model_path = *global_config->zhangxin_hdr_model_path();
+    }
+    
+    if (global_config->zhangxin_hdr_hue_lock()) {
+        c.hue_lock = *global_config->zhangxin_hdr_hue_lock();
+    }
+    
+    // Validation
+    if (c.enable && c.model_path.empty()) {
+        std::cerr << "[ZHANGXIN_HDR] Warning: HDR enabled but model path not set. "
+                  << "Please configure it in Edit -> Preferences -> Zhangxin HDR." << std::endl;
+    }
+    
+    return c;
+}
+
 shared_ptr<Image>
 ZhangxinHDR::process(shared_ptr<const Image> image, Config config)
 {
@@ -140,7 +168,7 @@ ZhangxinHDR::process(shared_ptr<const Image> image, Config config)
     
     // Init ORT if needed
     if (!g_ort_ctx || !g_ort_ctx->session) {
-        init_ort_session();
+        init_ort_session(config.model_path);
     }
     
     // If Init failed, fallback to Passthrough
@@ -297,12 +325,12 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     
     // Init ORT if needed
     if (!g_ort_ctx || !g_ort_ctx->session) {
-        init_ort_session();
+        init_ort_session(config.model_path);
     }
     
     // If Init failed, throw error. We do NOT use fallback in production or strict testing.
     if (!g_ort_ctx || !g_ort_ctx->session) {
-        throw std::runtime_error("[ZHANGXIN_HDR] Critical Error: HDR Model not loaded! Set ZHANGXIN_HDR_MODEL env var.");
+        throw std::runtime_error("[ZHANGXIN_HDR] Critical Error: HDR Model not loaded! Configure model path in Edit -> Preferences -> Zhangxin HDR.");
     }
 
 

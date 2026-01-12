@@ -34,6 +34,9 @@ public:
         bool debug_mode = false; 
         bool dump_debug_frames = false; // Dump input/output frames for analysis
         std::string dump_path = "/tmp";
+        std::string model_path;
+
+        static Config load_from_config();
     };
 
     struct Stats {

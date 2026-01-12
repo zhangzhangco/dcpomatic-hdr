@@ -222,6 +222,9 @@ Config::set_defaults()
 	_player_http_server_port = 8080;
 	_relative_paths = false;
 	_layout_for_short_screen = false;
+	_zhangxin_hdr_enable = false;
+	_zhangxin_hdr_model_path = boost::none;
+	_zhangxin_hdr_hue_lock = false;
 
 	_allowed_dcp_frame_rates.clear();
 	_allowed_dcp_frame_rates.push_back(24);
@@ -668,6 +671,9 @@ try
 	_player_http_server_port = f.optional_number_child<int>("PlayerHTTPServerPort").get_value_or(8080);
 	_relative_paths = f.optional_bool_child("RelativePaths").get_value_or(false);
 	_layout_for_short_screen = f.optional_bool_child("LayoutForShortScreen").get_value_or(false);
+	_zhangxin_hdr_enable = f.optional_bool_child("ZhangxinHDREnable");
+	_zhangxin_hdr_model_path = f.optional_string_child("ZhangxinHDRModelPath");
+	_zhangxin_hdr_hue_lock = f.optional_bool_child("ZhangxinHDRHueLock");
 
 #ifdef DCPOMATIC_GROK
 	if (auto grok = f.optional_node_child("Grok")) {
@@ -981,6 +987,16 @@ Config::write_config() const
 	}
 	/* [XML] CoverSheet Text of the cover sheet to write when making DCPs. */
 	cxml::add_text_child(root, "CoverSheet", _cover_sheet);
+
+	if (_zhangxin_hdr_enable) {
+		cxml::add_text_child(root, "ZhangxinHDREnable", *_zhangxin_hdr_enable ? "1" : "0");
+	}
+	if (_zhangxin_hdr_model_path) {
+		cxml::add_text_child(root, "ZhangxinHDRModelPath", *_zhangxin_hdr_model_path);
+	}
+	if (_zhangxin_hdr_hue_lock) {
+		cxml::add_text_child(root, "ZhangxinHDRHueLock", *_zhangxin_hdr_hue_lock ? "1" : "0");
+	}
 	if (_last_player_load_directory) {
 		cxml::add_text_child(root, "LastPlayerLoadDirectory", _last_player_load_directory->string());
 	}

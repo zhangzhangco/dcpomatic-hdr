@@ -38,6 +38,9 @@
 #include "encode_server_description.h"
 #include "exceptions.h"
 #include "image.h"
+#include "zhangxin_hdr.h"
+#include <dcp/gamma_transfer_function.h>
+#include <dcp/modified_gamma_transfer_function.h>
 #include "log.h"
 #include "player_video.h"
 #include "rng.h"
@@ -58,7 +61,10 @@ LIBDCP_ENABLE_WARNINGS
 #include <boost/thread.hpp>
 #include <stdint.h>
 #include <iomanip>
+#include <iomanip>
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 
 #include "i18n.h"
 
@@ -99,10 +105,7 @@ DCPVideo::DCPVideo(shared_ptr<const PlayerVideo> frame, shared_ptr<const cxml::N
 	_resolution = Resolution(node->optional_number_child<int>("Resolution").get_value_or(static_cast<int>(Resolution::TWO_K)));
 }
 
-#include "zhangxin_hdr.h"
-#include <dcp/gamma_transfer_function.h>
-#include <dcp/chromaticity.h>
-#include <algorithm>
+
 
 // === ST 2084 PQ OETF (Encoding) ===
 // Input: Linear luminance in cd/m² (nits)
@@ -143,28 +146,29 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
 
     // [ZHANGXIN] HDR Processor Insertion Point
     // NOTE: This HDR pipeline is EXPERIMENTAL until MXF TransferCharacteristic UL is set (DCI HDR Addendum).
-    ZhangxinHDR::Config hdr_config;
-    
-    if (getenv("ZHANGXIN_HDR_ENABLE")) {
-        hdr_config.enable = true;
-        hdr_config.debug_mode = (getenv("ZHANGXIN_HDR_DEBUG") != nullptr);
-        hdr_config.dump_debug_frames = (getenv("ZHANGXIN_HDR_DUMP") != nullptr);
-        hdr_config.hue_lock = (getenv("ZHANGXIN_HDR_HUE_LOCK") != nullptr);
-        
-        const char* gamma_env = getenv("ZHANGXIN_HDR_GAMMA");
-        if (gamma_env) {
-            std::string g(gamma_env);
-            if (g == "2.6") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_26;
-            else if (g == "2.4") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_24;
-            else if (g == "REC709") hdr_config.transfer_function = ZhangxinHDR::TransferFunction::REC709_SCENE_LINEAR;
-            // Default GAMMA_24 from Config constructor
-        }
-    }
+    static const ZhangxinHDR::Config hdr_config = ZhangxinHDR::Config::load_from_config();
 
     if (hdr_config.enable) {
         // === HDR Path: Direct PQ Encoding ===
+        ZhangxinHDR::Config frame_config = hdr_config;
+
+        if (frame->colour_conversion()) {
+             auto in_tf = frame->colour_conversion()->in();
+             // Map DCP TransferFunction to ZhangxinHDR TransferFunction
+             if (auto gamma_tf = std::dynamic_pointer_cast<const dcp::GammaTransferFunction>(in_tf)) {
+                 if (fabs(gamma_tf->gamma() - 2.6) < 0.1) {
+                     frame_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_26;
+                 } else {
+                     frame_config.transfer_function = ZhangxinHDR::TransferFunction::GAMMA_24;
+                 }
+             } else if (std::dynamic_pointer_cast<const dcp::ModifiedGammaTransferFunction>(in_tf)) {
+                 // Assume this is Rec.709 or similar scene-referred
+                 frame_config.transfer_function = ZhangxinHDR::TransferFunction::REC709_SCENE_LINEAR;
+             }
+        }
+
         // 1. Run HDR model: outputs linear XYZ in cd/m² (absolute luminance)
-        auto hdr_xyz = ZhangxinHDR::process_to_hdr_xyz(image, hdr_config);
+        auto hdr_xyz = ZhangxinHDR::process_to_hdr_xyz(image, frame_config);
         
         if (hdr_xyz.width == 0 || hdr_xyz.height == 0) {
             // Model failed, fallback to original SDR path

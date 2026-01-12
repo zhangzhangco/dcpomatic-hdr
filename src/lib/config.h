@@ -689,6 +689,18 @@ public:
 		return _layout_for_short_screen;
 	}
 
+	boost::optional<bool> zhangxin_hdr_enable() const {
+		return _zhangxin_hdr_enable;
+	}
+
+	boost::optional<std::string> zhangxin_hdr_model_path() const {
+		return _zhangxin_hdr_model_path;
+	}
+
+	boost::optional<bool> zhangxin_hdr_hue_lock() const {
+		return _zhangxin_hdr_hue_lock;
+	}
+
 	/* SET (mostly) */
 
 	void set_master_encoding_threads(int n) {
@@ -1266,6 +1278,24 @@ public:
 	}
 
 
+
+
+	void set_zhangxin_hdr_enable(bool e) {
+		maybe_set(_zhangxin_hdr_enable, e);
+	}
+
+	void set_zhangxin_hdr_model_path(std::string p) {
+		maybe_set(_zhangxin_hdr_model_path, p);
+	}
+
+	void set_zhangxin_hdr_hue_lock(bool h) {
+		maybe_set(_zhangxin_hdr_hue_lock, h);
+	}
+
+
+
+
+
 	void changed(Property p = OTHER);
 	boost::signals2::signal<void (Property)> Changed;
 	/** Emitted if read() failed on an existing Config file.  There is nothing
@@ -1512,6 +1542,9 @@ private:
 	int _player_http_server_port;
 	bool _relative_paths;
 	bool _layout_for_short_screen;
+	boost::optional<bool> _zhangxin_hdr_enable;
+	boost::optional<std::string> _zhangxin_hdr_model_path;
+	boost::optional<bool> _zhangxin_hdr_hue_lock;
 
 #ifdef DCPOMATIC_GROK
 	Grok _grok;
