@@ -49,3 +49,5 @@ deps/
 test_phase2_proj/
 local_target/
 HDR_XYZ_Test_Project/
+Stem_HDR_Full/
+stem_full_cli_out.txt
