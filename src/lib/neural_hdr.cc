@@ -138,17 +138,17 @@ NeuralHDR::Config::load_from_config()
     
     auto global_config = ::Config::instance();
     
-    if (global_config->neural_hdr_enable()) {
-        c.enable = *global_config->neural_hdr_enable();
+    c.enable = global_config->neural_hdr_enable();
+    
+    // Hardcoded model path relative to executable
+    try {
+        boost::filesystem::path exe = boost::filesystem::read_symlink("/proc/self/exe");
+        c.model_path = (exe.parent_path() / "neural_hdr.onnx").string();
+    } catch (...) {
+        c.model_path = "neural_hdr.onnx"; // Fallback to CWD
     }
     
-    if (global_config->neural_hdr_model_path()) {
-        c.model_path = *global_config->neural_hdr_model_path();
-    }
-    
-    if (global_config->neural_hdr_hue_lock()) {
-        c.hue_lock = *global_config->neural_hdr_hue_lock();
-    }
+    c.hue_lock = global_config->neural_hdr_hue_lock();
     
     // Validation
     if (c.enable && c.model_path.empty()) {

@@ -689,15 +689,13 @@ public:
 		return _layout_for_short_screen;
 	}
 
-	boost::optional<bool> neural_hdr_enable() const {
+	bool neural_hdr_enable() const {
 		return _neural_hdr_enable;
 	}
 
-	boost::optional<std::string> neural_hdr_model_path() const {
-		return _neural_hdr_model_path;
-	}
 
-	boost::optional<bool> neural_hdr_hue_lock() const {
+
+	bool neural_hdr_hue_lock() const {
 		return _neural_hdr_hue_lock;
 	}
 
@@ -1284,9 +1282,7 @@ public:
 		maybe_set(_neural_hdr_enable, e);
 	}
 
-	void set_neural_hdr_model_path(std::string p) {
-		maybe_set(_neural_hdr_model_path, p);
-	}
+
 
 	void set_neural_hdr_hue_lock(bool h) {
 		maybe_set(_neural_hdr_hue_lock, h);
@@ -1542,9 +1538,9 @@ private:
 	int _player_http_server_port;
 	bool _relative_paths;
 	bool _layout_for_short_screen;
-	boost::optional<bool> _neural_hdr_enable;
-	boost::optional<std::string> _neural_hdr_model_path;
-	boost::optional<bool> _neural_hdr_hue_lock;
+	bool _neural_hdr_enable = false;
+
+	bool _neural_hdr_hue_lock = false;
 
 #ifdef DCPOMATIC_GROK
 	Grok _grok;

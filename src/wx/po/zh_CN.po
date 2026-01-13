@@ -5268,17 +5268,23 @@ msgstr "是"
 #~ msgstr "视频"
 
 # Neural HDR Translations
+#: src/wx/full_config_dialog.cc:1493
 msgid "Neural HDR"
 msgstr "神经网络 HDR"
 
+#: src/wx/full_config_dialog.cc:1510
 msgid "Enable Neural HDR Processing"
 msgstr "启用神经网络 HDR 处理"
 
+#: src/wx/full_config_dialog.cc:1514
 msgid "Model Path"
 msgstr "模型路径"
 
+#: src/wx/full_config_dialog.cc:1515
 msgid "Select ONNX Model"
 msgstr "选择 ONNX 模型"
 
+#: src/wx/full_config_dialog.cc:1518
 msgid "Enable Hue Lock Strategy"
 msgstr "启用色相锁定策略"
+

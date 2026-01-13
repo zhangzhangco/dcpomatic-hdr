@@ -1511,27 +1511,23 @@ private:
 		table->Add(_enable, 1, wxEXPAND | wxALL);
 		table->AddSpacer(0);
 
-		add_label_to_sizer(table, _panel, _("Model Path"), true, 0, wxLEFT | wxRIGHT | wxALIGN_CENTRE_VERTICAL);
-		_model_path = new FilePickerCtrl(_panel, _("Select ONNX Model"), "*.onnx", true, false, "NeuralHDRModelPath");
-		table->Add(_model_path, 1, wxEXPAND | wxALL);
+
 
 		_hue_lock = new CheckBox(_panel, _("Enable Hue Lock Strategy"));
 		table->Add(_hue_lock, 1, wxEXPAND | wxALL);
 		table->AddSpacer(0);
 
 		_enable->bind(&NeuralHDRPage::enable_changed, this);
-		_model_path->Bind(wxEVT_FILEPICKER_CHANGED, boost::bind(&NeuralHDRPage::model_path_changed, this));
+
 		_hue_lock->bind(&NeuralHDRPage::hue_lock_changed, this);
 	}
 
 	void config_changed() override
 	{
 		auto config = Config::instance();
-		checked_set(_enable, config->neural_hdr_enable().get_value_or(false));
-		if (config->neural_hdr_model_path()) {
-			_model_path->set_path(boost::filesystem::path(*config->neural_hdr_model_path()));
-		}
-		checked_set(_hue_lock, config->neural_hdr_hue_lock().get_value_or(false));
+		checked_set(_enable, config->neural_hdr_enable());
+
+		checked_set(_hue_lock, config->neural_hdr_hue_lock());
 	}
 
 	void enable_changed()
@@ -1539,14 +1535,7 @@ private:
 		Config::instance()->set_neural_hdr_enable(_enable->GetValue());
 	}
 
-	void model_path_changed()
-	{
-		if (_model_path->path()) {
-			Config::instance()->set_neural_hdr_model_path(_model_path->path()->string());
-		} else {
-			Config::instance()->set_neural_hdr_model_path("");
-		}
-	}
+
 
 	void hue_lock_changed()
 	{
@@ -1554,7 +1543,7 @@ private:
 	}
 
 	CheckBox* _enable;
-	FilePickerCtrl* _model_path;
+
 	CheckBox* _hue_lock;
 };
 

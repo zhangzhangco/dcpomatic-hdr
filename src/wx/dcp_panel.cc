@@ -568,6 +568,10 @@ DCPPanel::film_content_changed(int property)
 void
 DCPPanel::setup_container()
 {
+	if (!_film) {
+		return;
+	}
+
 	auto ratios = Ratio::containers();
 	if (std::find(ratios.begin(), ratios.end(), _film->container()) == ratios.end()) {
 		ratios.push_back(_film->container());

@@ -36,7 +36,7 @@ def export(pth_path, onnx_path):
         dummy_input, 
         onnx_path,
         export_params=True,
-        opset_version=11, # Safe compatible version
+        opset_version=17, # Compatible with ONNX Runtime 1.19.2
         do_constant_folding=True,
         input_names=['input'],
         output_names=['gain_map', 'hdr_pred'],
