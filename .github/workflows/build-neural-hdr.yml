@@ -219,7 +219,7 @@ jobs:
         brew install \
           boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
           pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
-          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio libxml++@2.6
 
     # ---- Build asdcplib ----
     - name: Build asdcplib (macOS)
@@ -241,10 +241,11 @@ jobs:
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
         PREFIX=$(brew --prefix)
-        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
-        export CPPFLAGS="-I$PREFIX/include"
-        export LDFLAGS="-L$PREFIX/lib"
-        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        XMLPP_PREFIX=$(brew --prefix libxml++@2.6)
+        export CXXFLAGS="-I$PREFIX/include -I$XMLPP_PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include -I$XMLPP_PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib -L$XMLPP_PREFIX/lib"
+        export PKG_CONFIG_PATH="$XMLPP_PREFIX/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
@@ -386,7 +387,9 @@ jobs:
       run: |
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
+        export CXX=g++
+        export CC=gcc
+        ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
