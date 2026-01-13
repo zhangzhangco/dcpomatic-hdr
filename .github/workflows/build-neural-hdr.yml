@@ -109,7 +109,8 @@ jobs:
         git clone https://github.com/fastfloat/fast_float.git fast_float
         cd fast_float
         sudo mkdir -p /usr/local/include/fast_float
-        sudo cp include/fast_float/fast_float.h /usr/local/include/fast_float/
+        sudo cp -r include/fast_float/* /usr/local/include/fast_float/
+        ls -la /usr/local/include/fast_float/
 
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp (with HDR Patch)
@@ -125,7 +126,7 @@ jobs:
         
         export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
         
-        ./waf configure --prefix=/usr/local --disable-tests --disable-examples
+        CXXFLAGS="-I/usr/local/include" ./waf configure --prefix=/usr/local --disable-tests --disable-examples
         ./waf build
         sudo ./waf install
         sudo ldconfig
