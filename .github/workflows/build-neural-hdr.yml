@@ -94,21 +94,19 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
-        ./waf configure --prefix=/usr/local
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
+        ./waf configure --prefix=/usr/local --disable-tests
         ./waf build
         sudo ./waf install
         sudo ldconfig
-        # Verify pkg-config file exists
-        pkg-config --modversion libcxml || echo "libcxml pkg-config not found!"
+        
+        echo "=== libcxml.pc content ==="
+        cat /usr/local/lib/pkgconfig/libcxml.pc || true
+        pkg-config --cflags --libs libcxml
 
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp (with HDR Patch)
       run: |
-        # Debug: show available pkg-config files
-        echo "=== Available pkg-config files ==="
-        find /usr/local -name "*.pc" 2>/dev/null || true
-        
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
         
@@ -117,8 +115,10 @@ jobs:
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
         
         export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-        pkg-config --list-all | grep -E "(cxml|asdcp)" || true
+        
+        # Verbose check
+        echo "Testing pkg-config for libcxml..."
+        pkg-config --exists --print-errors libcxml
         
         ./waf configure --prefix=/usr/local --disable-tests --disable-examples
         ./waf build
