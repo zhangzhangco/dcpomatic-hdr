@@ -226,7 +226,7 @@ jobs:
       run: |
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        CXXFLAGS="-Wno-deprecated-declarations" ./waf configure --prefix=/usr/local
+        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -235,7 +235,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        CXXFLAGS="-Wno-deprecated-declarations" ./waf configure --prefix=/usr/local
+        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -247,7 +247,7 @@ jobs:
         git tag -f v1.10.0
         # Apply patch for neural HDR integration
         git apply ../dcpomatic/libdcp_hdr_integration.patch
-        CXXFLAGS="-I/usr/local/include -Wno-deprecated-declarations" ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
+        CXXFLAGS="-I/usr/local/include -I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
         ./waf build
         sudo ./waf install
 
@@ -257,7 +257,7 @@ jobs:
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
         git tag -f v1.6.58
-        ./waf configure --prefix=/usr/local
+        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -268,7 +268,7 @@ jobs:
         cd leqm-nrt
         git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
         cp ../dcpomatic/waf .
-        ./waf configure --prefix=/usr/local
+        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations" ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
