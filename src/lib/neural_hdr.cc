@@ -49,16 +49,41 @@ static void init_ort_session(const std::string& model_path) {
     try {
         if (!g_ort_ctx) g_ort_ctx.reset(new OrtContext());
         
-        Ort::SessionOptions session_options;
-        session_options.SetIntraOpNumThreads(4); 
-        session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+        bool session_created = false;
 
-        std::cout << "[NEURAL_HDR] Loading ONNX model from " << model_path << " ..." << std::endl;
-        g_ort_ctx->session.reset(new Ort::Session(g_ort_ctx->env, model_path.c_str(), session_options));
-        std::cout << "[NEURAL_HDR] Model loaded successfully." << std::endl;
-    } catch (const Ort::Exception& e) {
-        std::cerr << "[NEURAL_HDR] ORT Exception: " << e.what() << std::endl;
-        g_ort_ctx.reset(); 
+        // 1. Try with CUDA
+        try {
+            Ort::SessionOptions gpu_options;
+            gpu_options.SetIntraOpNumThreads(4); 
+            gpu_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+            OrtCUDAProviderOptions cuda_options;
+            cuda_options.device_id = 0;
+            gpu_options.AppendExecutionProvider_CUDA(cuda_options);
+
+            std::cout << "[NEURAL_HDR] Attempting to load model with CUDA from " << model_path << " ..." << std::endl;
+            g_ort_ctx->session.reset(new Ort::Session(g_ort_ctx->env, model_path.c_str(), gpu_options));
+            std::cout << "[NEURAL_HDR] Model loaded successfully with CUDA." << std::endl;
+            session_created = true;
+        } catch (const std::exception& e) {
+            std::cerr << "[NEURAL_HDR] CUDA initialization failed: " << e.what() << ". Falling back to CPU." << std::endl;
+        } catch (...) {
+            std::cerr << "[NEURAL_HDR] CUDA initialization failed (unknown error). Falling back to CPU." << std::endl;
+        }
+
+        // 2. Fallback to CPU if GPU failed
+        if (!session_created) {
+            std::cout << "[NEURAL_HDR] Loading model with CPU from " << model_path << " ..." << std::endl;
+            Ort::SessionOptions cpu_options;
+            cpu_options.SetIntraOpNumThreads(4); 
+            cpu_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            
+            g_ort_ctx->session.reset(new Ort::Session(g_ort_ctx->env, model_path.c_str(), cpu_options));
+            std::cout << "[NEURAL_HDR] Model loaded successfully with CPU." << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[NEURAL_HDR] Fatal Error: Failed to initialize session: " << e.what() << std::endl;
+        g_ort_ctx.reset();
     }
 }
 
