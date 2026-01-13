@@ -118,11 +118,11 @@ jobs:
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
         # Force a tag to ensure version detection works
-        git tag -f v1.8.99
+        git tag -f v1.10.0
         
         # Apply HDR Integration Patch
         echo "Applying HDR patch..."
-        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        git apply ../dcpomatic/libdcp_hdr_integration.patch
         
         export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
         
@@ -242,8 +242,10 @@ jobs:
       run: |
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
-        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
-        CXXFLAGS="-Wno-deprecated-declarations" ./waf configure --prefix=/usr/local --disable-tests --disable-examples
+        git tag -f v1.10.0
+        # Apply patch for neural HDR integration
+        git apply ../dcpomatic/libdcp_hdr_integration.patch
+        CXXFLAGS="-I/usr/local/include -Wno-deprecated-declarations" ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
         ./waf build
         sudo ./waf install
 
@@ -372,6 +374,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
+        git tag -f v1.10.0
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
         ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
         ./waf build
