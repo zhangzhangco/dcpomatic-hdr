@@ -163,7 +163,7 @@ jobs:
         PREFIX=$(brew --prefix)
         export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations"
         export CPPFLAGS="-I$PREFIX/include"
-        export LDFLAGS="-L$PREFIX/lib"
+        export LDFLAGS="-L$PREFIX/lib -lsndfile"
         export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./waf configure --prefix=/usr/local
         ./waf build
