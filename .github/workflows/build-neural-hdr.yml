@@ -41,7 +41,6 @@ jobs:
     - name: Checkout DCP-o-matic
       uses: actions/checkout@v4
       with:
-        submodules: recursive
         path: dcpomatic
 
     - name: Install System Dependencies
@@ -162,7 +161,6 @@ jobs:
     - name: Checkout DCP-o-matic
       uses: actions/checkout@v4
       with:
-        submodules: recursive
         path: dcpomatic
 
     - name: Install Dependencies via Homebrew
@@ -290,7 +288,6 @@ jobs:
     - name: Checkout DCP-o-matic
       uses: actions/checkout@v4
       with:
-        submodules: recursive
         path: dcpomatic
 
     # ---- Build asdcplib ----
