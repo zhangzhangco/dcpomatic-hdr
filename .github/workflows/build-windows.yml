@@ -109,7 +109,12 @@ jobs:
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
-        python3 waf configure --prefix=/mingw64 --boost-lib-suffix=-mt
+        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
+        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
+        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
+        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
+        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        python3 waf configure --prefix=/mingw64
         python3 waf build
         python3 waf install
 
@@ -127,7 +132,12 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples --boost-lib-suffix=-mt
+        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
+        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
+        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
+        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
+        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples
         python3 waf build
         python3 waf install
 
@@ -144,7 +154,12 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        python3 waf configure --prefix=/mingw64 --boost-lib-suffix=-mt
+        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
+        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
+        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
+        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
+        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        python3 waf configure --prefix=/mingw64
         python3 waf build
         python3 waf install
 
@@ -189,7 +204,12 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        python3 waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt --boost-lib-suffix=-mt
+        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
+        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
+        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
+        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
+        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        python3 waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
         python3 waf build -j$(nproc)
 
     - name: Package Windows Build
