@@ -134,7 +134,7 @@ jobs:
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib"
         export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-        ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
+        ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests --disable-examples
         ./waf build
         sudo ./waf install
 
