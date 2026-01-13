@@ -103,6 +103,14 @@ jobs:
         sudo ./waf install
         sudo ldconfig
 
+    # ---- Install fast_float (required by libdcp) ----
+    - name: Install fast_float
+      run: |
+        git clone https://github.com/fastfloat/fast_float.git fast_float
+        cd fast_float
+        sudo mkdir -p /usr/local/include/fast_float
+        sudo cp include/fast_float/fast_float.h /usr/local/include/fast_float/
+
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp (with HDR Patch)
       run: |
