@@ -89,7 +89,6 @@ jobs:
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
-        sudo ldconfig
 
     # ---- Build libcxml ----
     - name: Build libcxml
@@ -219,7 +218,7 @@ jobs:
         brew install \
           boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
           pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
-          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio libxml++@2.6
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glibmm
 
     # ---- Build asdcplib ----
     - name: Build asdcplib (macOS)
@@ -236,16 +235,29 @@ jobs:
         sudo ./waf install
 
     # ---- Build libcxml ----
+    - name: Build libxml++ 2.6 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/libxml++/2.40/libxml++-2.40.1.tar.xz
+        tar xf libxml++-2.40.1.tar.xz
+        cd libxml++-2.40.1
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+    # ---- Build libcxml ----
     - name: Build libcxml (macOS)
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
         PREFIX=$(brew --prefix)
-        XMLPP_PREFIX=$(brew --prefix libxml++@2.6)
-        export CXXFLAGS="-I$PREFIX/include -I$XMLPP_PREFIX/include -Wno-deprecated-declarations -std=c++11"
-        export CPPFLAGS="-I$PREFIX/include -I$XMLPP_PREFIX/include"
-        export LDFLAGS="-L$PREFIX/lib -L$XMLPP_PREFIX/lib"
-        export PKG_CONFIG_PATH="$XMLPP_PREFIX/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
@@ -387,8 +399,8 @@ jobs:
       run: |
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        export CXX=g++
-        export CC=gcc
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
         ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
@@ -398,7 +410,9 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -409,7 +423,9 @@ jobs:
         cd libdcp
         git tag -f v1.10.0
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
-        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
         ./waf build
         ./waf install
 
@@ -419,7 +435,9 @@ jobs:
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
         git tag -f v1.6.58
-        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -430,7 +448,9 @@ jobs:
         cd leqm-nrt
         git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
         cp ../dcpomatic/waf .
-        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -450,7 +470,9 @@ jobs:
     - name: Configure and Build DCP-o-matic (Windows)
       run: |
         cd dcpomatic
-        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
         ./waf build -j$(nproc)
 
     - name: Package Windows Build
