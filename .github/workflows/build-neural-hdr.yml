@@ -147,6 +147,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
         cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
         cp ../dcpomatic/waf .
         ./waf configure --prefix=/usr/local
         ./waf build
@@ -251,6 +252,17 @@ jobs:
       run: |
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt (macOS)
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
@@ -370,6 +382,17 @@ jobs:
       run: |
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt (Windows)
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
         ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
