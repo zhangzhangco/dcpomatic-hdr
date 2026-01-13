@@ -91,7 +91,7 @@ jobs:
         echo "Applying HDR patch..."
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
         
-        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf configure --prefix=/usr/local --disable-tests --disable-examples
         ./waf build
         sudo ./waf install
         sudo ldconfig
@@ -197,7 +197,7 @@ jobs:
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
-        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf configure --prefix=/usr/local --disable-tests --disable-examples
         ./waf build
         sudo ./waf install
 
@@ -317,7 +317,7 @@ jobs:
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
-        ./waf configure --prefix=/mingw64 --disable-tests
+        ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
         ./waf build
         ./waf install
 
