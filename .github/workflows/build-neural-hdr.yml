@@ -84,23 +84,24 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        git checkout ${{ env.LIBCXML_VERSION }} || true
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
         sudo ldconfig
+        # Verify pkg-config file exists
+        ls -la /usr/local/lib/pkgconfig/
 
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp (with HDR Patch)
       run: |
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
-        git checkout ${{ env.LIBDCP_VERSION }} || true
         
         # Apply HDR Integration Patch
         echo "Applying HDR patch..."
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
         
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
         ./waf configure --prefix=/usr/local --disable-tests --disable-examples
         ./waf build
         sudo ./waf install
