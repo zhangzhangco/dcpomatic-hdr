@@ -55,8 +55,19 @@ jobs:
           libsndfile1-dev libsamplerate0-dev libpulse-dev libasound2-dev \
           libicu-dev nettle-dev libx264-dev libsqlite3-dev \
           libxerces-c-dev libhpdf-dev libfmt-dev libnanomsg-dev \
-          libjpeg-dev libpng-dev libtiff-dev \
+          libjpeg-dev libpng-dev libtiff-dev libopenjp2-7-dev \
           autoconf automake libtool cmake gettext
+
+    # ---- Build OpenJPEG 2.5 (required by libdcp) ----
+    - name: Build OpenJPEG 2.5
+      run: |
+        git clone --branch v2.5.0 https://github.com/uclouvain/openjpeg.git openjpeg
+        cd openjpeg
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc)
+        sudo make install
+        sudo ldconfig
 
     # ---- Build asdcplib ----
     - name: Build asdcplib
