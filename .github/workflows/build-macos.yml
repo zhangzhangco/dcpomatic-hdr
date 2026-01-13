@@ -102,6 +102,8 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
+        # Force a tag to ensure version detection works
+        git tag -f v0.17.10
         PREFIX=$(brew --prefix)
         export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
         export CPPFLAGS="-I$PREFIX/include"
