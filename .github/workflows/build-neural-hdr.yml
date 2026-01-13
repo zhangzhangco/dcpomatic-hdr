@@ -63,9 +63,10 @@ jobs:
       run: |
         git clone https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        ./waf configure --prefix=/usr/local
-        ./waf build
-        sudo ./waf install
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)
+        sudo make install
         sudo ldconfig
 
     # ---- Build libcxml ----
@@ -176,9 +177,10 @@ jobs:
       run: |
         git clone https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        ./waf configure --prefix=/usr/local
-        ./waf build
-        sudo ./waf install
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
 
     # ---- Build libcxml ----
     - name: Build libcxml (macOS)
@@ -295,9 +297,10 @@ jobs:
       run: |
         git clone https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        ./waf configure --prefix=/mingw64
-        ./waf build
-        ./waf install
+        mkdir build && cd build
+        cmake .. -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64
+        make -j$(nproc)
+        make install
 
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
