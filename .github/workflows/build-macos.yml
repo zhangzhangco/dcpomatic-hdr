@@ -41,7 +41,7 @@ jobs:
         brew install \
           boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
           pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
-          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glib
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glib meson ninja
 
     # ---- Build asdcplib ----
     - name: Build asdcplib (macOS)
@@ -63,9 +63,10 @@ jobs:
         wget https://download.gnome.org/sources/libsigc++/2.10/libsigc++-2.10.8.tar.xz
         tar xf libsigc++-2.10.8.tar.xz
         cd libsigc++-2.10.8
-        ./configure --prefix=/usr/local
-        make -j$(sysctl -n hw.ncpu)
-        sudo make install
+        mkdir build
+        meson setup build --prefix=/usr/local
+        ninja -C build
+        sudo ninja -C build install
 
     # ---- Build glibmm 2.66 (Manual build for macOS) ----
     - name: Build glibmm 2.66 (macOS)
@@ -77,9 +78,10 @@ jobs:
         export CXXFLAGS="-I$PREFIX/include -std=c++11"
         export LDFLAGS="-L$PREFIX/lib"
         export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-        ./configure --prefix=/usr/local
-        make -j$(sysctl -n hw.ncpu)
-        sudo make install
+        mkdir build
+        meson setup build --prefix=/usr/local
+        ninja -C build
+        sudo ninja -C build install
 
     # ---- Build libxml++ 2.6 (Manual build for macOS) ----
     - name: Build libxml++ 2.6 (macOS)
