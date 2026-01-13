@@ -83,6 +83,7 @@ jobs:
         
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
+        sed -i "s/conf.load('msvc')/conf.load('g++')/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -95,6 +96,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
+        sed -i "s/conf.load('msvc')/conf.load('g++')/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -109,6 +111,7 @@ jobs:
         cd libdcp
         git tag -f v1.10.0
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        sed -i "s/conf.load('msvc')/conf.load('g++')/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -122,6 +125,7 @@ jobs:
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
         git tag -f v1.6.58
+        sed -i "s/conf.load('msvc')/conf.load('g++')/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -136,6 +140,7 @@ jobs:
         cd leqm-nrt
         git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
         cp ../dcpomatic/waf .
+        sed -i "s/conf.load('msvc')/conf.load('g++')/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -159,6 +164,7 @@ jobs:
     - name: Configure and Build DCP-o-matic (Windows)
       run: |
         cd dcpomatic
+        sed -i "s/conf.load('msvc')/conf.load('g++')/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
