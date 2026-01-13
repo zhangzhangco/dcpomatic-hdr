@@ -1514,6 +1514,8 @@ private:
 
 
 		_hue_lock = new CheckBox(_panel, _("Enable Hue Lock Strategy"));
+		_hue_lock->SetToolTip(_("This option is required for the standard model."));
+		_hue_lock->Enable(false);
 		table->Add(_hue_lock, 1, wxEXPAND | wxALL);
 		table->AddSpacer(0);
 

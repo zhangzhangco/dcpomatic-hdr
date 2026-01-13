@@ -175,7 +175,9 @@ NeuralHDR::Config::load_from_config()
         c.model_path = "neural_hdr.onnx"; // Fallback to CWD
     }
     
-    c.hue_lock = global_config->neural_hdr_hue_lock();
+    // Hardcode Hue Lock to true for the current standard model
+    c.hue_lock = true; 
+    // c.hue_lock = global_config->neural_hdr_hue_lock(); // Disabled for now
     
     // Validation and Auto-Download
     if (c.enable) {

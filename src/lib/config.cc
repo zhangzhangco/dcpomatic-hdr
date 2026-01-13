@@ -225,7 +225,7 @@ Config::set_defaults()
 	_layout_for_short_screen = false;
 	_neural_hdr_enable = false;
 
-	_neural_hdr_hue_lock = false;
+	_neural_hdr_hue_lock = true;
 
 	_allowed_dcp_frame_rates.clear();
 	_allowed_dcp_frame_rates.push_back(24);
