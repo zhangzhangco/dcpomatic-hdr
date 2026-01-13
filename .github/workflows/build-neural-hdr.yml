@@ -64,7 +64,7 @@ jobs:
         git clone --branch v2.5.0 https://github.com/uclouvain/openjpeg.git openjpeg
         cd openjpeg
         mkdir build && cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release -DBUILD_CODEC=OFF
         make -j$(nproc)
         sudo make install
         sudo ldconfig
