@@ -56,7 +56,7 @@ jobs:
           libicu-dev nettle-dev libx264-dev libsqlite3-dev \
           libxerces-c-dev libhpdf-dev libfmt-dev libnanomsg-dev \
           libjpeg-dev libpng-dev libtiff-dev libopenjp2-7-dev libwebp-dev \
-          libavcodec-dev libavutil-dev libswscale-dev libpostproc-dev \
+          libavcodec-dev libavutil-dev libswscale-dev libpostproc-dev libavformat-dev libswresample-dev \
           autoconf automake libtool cmake gettext
 
     # ---- Build OpenJPEG 2.5 (required by libdcp) ----
@@ -218,7 +218,7 @@ jobs:
         brew install \
           boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
           pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
-          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg
 
     # ---- Build asdcplib ----
     - name: Build asdcplib (macOS)
@@ -346,6 +346,7 @@ jobs:
           mingw-w64-x86_64-libharu
           mingw-w64-x86_64-fmt
           mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ffmpeg
           git patch python3 autoconf automake libtool pkg-config
 
     - name: Checkout DCP-o-matic
