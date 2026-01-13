@@ -122,8 +122,8 @@ jobs:
         PREFIX=$(brew --prefix)
         export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
-        export LDFLAGS="-L$PREFIX/lib"
-        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
         ./waf build
         sudo ./waf install
@@ -138,7 +138,7 @@ jobs:
         export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
         export CPPFLAGS="-I$PREFIX/include"
         export LDFLAGS="-L$PREFIX/lib"
-        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
@@ -154,7 +154,7 @@ jobs:
         export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations"
         export CPPFLAGS="-I$PREFIX/include"
         export LDFLAGS="-L$PREFIX/lib"
-        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
