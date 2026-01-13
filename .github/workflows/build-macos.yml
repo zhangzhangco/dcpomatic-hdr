@@ -113,6 +113,14 @@ jobs:
         ./waf build
         sudo ./waf install
 
+    # ---- Install fast_float (required by libdcp) ----
+    - name: Install fast_float (macOS)
+      run: |
+        git clone https://github.com/fastfloat/fast_float.git fast_float
+        cd fast_float
+        sudo mkdir -p /usr/local/include/fast_float
+        sudo cp -r include/fast_float/* /usr/local/include/fast_float/
+
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp with HDR Patch (macOS)
       run: |
