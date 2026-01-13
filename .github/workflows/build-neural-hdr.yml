@@ -226,7 +226,12 @@ jobs:
       run: |
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -235,7 +240,12 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -247,7 +257,12 @@ jobs:
         git tag -f v1.10.0
         # Apply patch for neural HDR integration
         git apply ../dcpomatic/libdcp_hdr_integration.patch
-        CXXFLAGS="-I/usr/local/include -I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
         ./waf build
         sudo ./waf install
 
@@ -257,7 +272,12 @@ jobs:
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
         git tag -f v1.6.58
-        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations -std=c++11" ./waf configure --prefix=/usr/local
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -268,7 +288,12 @@ jobs:
         cd leqm-nrt
         git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
         cp ../dcpomatic/waf .
-        CXXFLAGS="-I$(brew --prefix)/include -Wno-deprecated-declarations" ./waf configure --prefix=/usr/local
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
