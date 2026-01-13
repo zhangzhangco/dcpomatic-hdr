@@ -13,6 +13,8 @@
 #include <mutex>
 #include <memory>
 #include <onnxruntime_cxx_api.h>
+#include "internet.h"
+#include <boost/filesystem.hpp>
 
 using std::shared_ptr;
 using std::make_shared;
@@ -150,10 +152,33 @@ NeuralHDR::Config::load_from_config()
     
     c.hue_lock = global_config->neural_hdr_hue_lock();
     
-    // Validation
-    if (c.enable && c.model_path.empty()) {
-        std::cerr << "[NEURAL_HDR] Warning: HDR enabled but model path not set. "
-                  << "Please configure it in Edit -> Preferences -> Neural HDR." << std::endl;
+    // Validation and Auto-Download
+    if (c.enable) {
+        boost::filesystem::path model_p(c.model_path);
+        
+        if (!boost::filesystem::exists(model_p)) {
+            std::cout << "[NEURAL_HDR] Model not found at " << model_p << ". Attempting auto-download..." << std::endl;
+            try {
+                // TODO: Replace with your actual model storage URL
+                // Example: https://github.com/StartDt/dcpomatic-hdr-models/releases/download/v1.0/
+                string base_url = "https://github.com/zhangzhangco/dcpomatic-hdr/releases/download/model-v0.1/";
+                
+                download_to_file(base_url + "neural_hdr.onnx", model_p);
+                std::cout << "[NEURAL_HDR] Successfully downloaded neural_hdr.onnx" << std::endl;
+                
+                boost::filesystem::path data_p = model_p.parent_path() / (model_p.filename().string() + ".data");
+                download_to_file(base_url + "neural_hdr.onnx.data", data_p);
+                std::cout << "[NEURAL_HDR] Successfully downloaded neural_hdr.onnx.data" << std::endl;
+                
+            } catch (std::exception& e) {
+                std::cerr << "[NEURAL_HDR] Auto-download failed: " << e.what() << std::endl;
+            }
+        }
+
+        if (c.model_path.empty() || !boost::filesystem::exists(model_p)) {
+            std::cerr << "[NEURAL_HDR] Warning: HDR enabled but model file missing: " << c.model_path 
+                      << ". Please ensure neural_hdr.onnx and .data are present next to the executable." << std::endl;
+        }
     }
     
     return c;
