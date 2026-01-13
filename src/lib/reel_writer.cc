@@ -162,7 +162,7 @@ ReelWriter::ReelWriter(
 			}
 			setup(_j2k_picture_asset);
 			// [ZHANGXIN] Set HDR Transfer Characteristic (ST 2084 / PQ)
-			if (film()->enable_zhangxin_hdr()) {
+			if (film()->enable_neural_hdr()) {
 				_j2k_picture_asset->set_transfer_function(dcp::PictureTransferFunction::ST_2084);
 			}
 			picture_asset = _j2k_picture_asset;

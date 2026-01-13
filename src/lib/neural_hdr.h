@@ -1,15 +1,15 @@
 /*
-    Copyright (C) 2026 zhangxin
+    Copyright (C) 2026 neural
 */
 
-#ifndef DCPOMATIC_ZHANGXIN_HDR_H
-#define DCPOMATIC_ZHANGXIN_HDR_H
+#ifndef DCPOMATIC_NEURAL_HDR_H
+#define DCPOMATIC_NEURAL_HDR_H
 
 #include "image.h"
 #include <memory>
 #include <vector>
 
-class ZhangxinHDR
+class NeuralHDR
 {
 public:
     enum class TransferFunction {

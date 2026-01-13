@@ -44,6 +44,8 @@
 #include <dcp/reel_picture_asset.h>
 #include <dcp/reel_sound_asset.h>
 #include <dcp/reel_text_asset.h>
+#include <libcxml/cxml.h>
+#include <fmt/format.h>
 #include <dcp/search.h>
 #include <dcp/sound_asset.h>
 #include <dcp/sound_asset.h>
@@ -362,6 +364,25 @@ DCPExaminer::DCPExaminer(shared_ptr<const DCPContent> content, bool tolerant)
 	}
 
 	_cpl = selected_cpl->id();
+
+	/* Check for HDR metadata */
+	if (selected_cpl->file()) {
+		cxml::Document cpl_doc("CompositionPlaylist");
+		cpl_doc.read_file(selected_cpl->file().get());
+
+		for (auto extension : cpl_doc.node_children("ExtensionMetadata")) {
+			if (extension->optional_string_attribute("scope").get_value_or("") == "http://www.dcimovies.com/schemas/2018/HDR-Metadata" && extension->optional_string_child("Name").get_value_or("") == "Image Encoding Parameters") {
+				auto property_list = extension->optional_node_child("PropertyList");
+				if (property_list) {
+					for (auto property : property_list->node_children("Property")) {
+						if (property->optional_string_child("Name").get_value_or("") == "EOTF" && property->optional_string_child("Value").get_value_or("") == "ST 2084") {
+							_video_is_hdr = true;
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 

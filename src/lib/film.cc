@@ -487,7 +487,7 @@ Film::metadata(bool with_content_paths) const
 	}
 	
 	// [ZHANGXIN] HDR Configuration
-	cxml::add_text_child(root, "EnableZhangxinHDR", _enable_zhangxin_hdr ? "1" : "0");
+	cxml::add_text_child(root, "EnableNeuralHDR", _enable_neural_hdr ? "1" : "0");
 	cxml::add_text_child(root, "HDRWhiteNits", fmt::to_string(_hdr_white_nits));
 	
 	_playlist->as_xml(
@@ -723,7 +723,7 @@ Film::read_metadata(optional<boost::filesystem::path> path)
 	}
 	
 	// [ZHANGXIN] HDR Configuration
-	_enable_zhangxin_hdr = f.optional_bool_child("EnableZhangxinHDR").get_value_or(false);
+	_enable_neural_hdr = f.optional_bool_child("EnableNeuralHDR").get_value_or(false);
 	_hdr_white_nits = f.optional_number_child<float>("HDRWhiteNits").get_value_or(300.0f);
 
 	/* Read the old ISDCFMetadata tag from 2.14.x metadata */
@@ -1319,10 +1319,10 @@ Film::set_limit_to_smpte_bv20(bool limit)
 
 // [ZHANGXIN] HDR Configuration
 void
-Film::set_enable_zhangxin_hdr(bool e)
+Film::set_enable_neural_hdr(bool e)
 {
-	FilmChangeSignaller cc(this, FilmProperty::ENABLE_ZHANGXIN_HDR);
-	_enable_zhangxin_hdr = e;
+	FilmChangeSignaller cc(this, FilmProperty::ENABLE_NEURAL_HDR);
+	_enable_neural_hdr = e;
 }
 
 void

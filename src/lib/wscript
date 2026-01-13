@@ -242,7 +242,7 @@ sources = """
           video_ring_buffers.cc
           writer.cc
           zipper.cc
-          zhangxin_hdr.cc
+          neural_hdr.cc
           """
 
 def build(bld):

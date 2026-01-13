@@ -49,7 +49,7 @@ class PlayerVideo;
 class DCPVideo
 {
 public:
-	DCPVideo(std::shared_ptr<const PlayerVideo>, int index, int dcp_fps, int64_t bit_rate, Resolution r);
+	DCPVideo(std::shared_ptr<const PlayerVideo>, int index, int dcp_fps, int64_t bit_rate, Resolution r, bool enable_neural_hdr = false);
 	DCPVideo(std::shared_ptr<const PlayerVideo>, cxml::ConstNodePtr);
 
 	DCPVideo(DCPVideo const&) = default;
@@ -66,7 +66,7 @@ public:
 
 	bool same(std::shared_ptr<const DCPVideo> other) const;
 
-	static std::shared_ptr<dcp::OpenJPEGImage> convert_to_xyz(std::shared_ptr<const PlayerVideo> frame);
+	static std::shared_ptr<dcp::OpenJPEGImage> convert_to_xyz(std::shared_ptr<const PlayerVideo> frame, bool enable_neural_hdr = false);
 
 	void convert_to_xyz(uint16_t* dst) const;
 	dcp::Size get_size() const;
@@ -80,6 +80,7 @@ private:
 	int _frames_per_second;		 ///< Frames per second that we will use for the DCP
 	int64_t _video_bit_rate;	 ///< Video bit rate to use
 	Resolution _resolution;          ///< Resolution (2K or 4K)
+	bool _enable_neural_hdr;         ///< Enable Neural HDR processing
 };
 
 #endif

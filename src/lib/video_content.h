@@ -56,6 +56,7 @@ public:
 	static int constexpr CUSTOM_RATIO = 8;
 	static int constexpr CUSTOM_SIZE = 9;
 	static int constexpr BURNT_SUBTITLE_LANGUAGE = 10;
+	static int constexpr VIDEO_IS_HDR = 11;
 };
 
 
@@ -109,6 +110,12 @@ public:
 
 	void set_range(VideoRange);
 	void set_use(bool);
+
+	void set_video_is_hdr(bool h);
+	bool video_is_hdr() const {
+		boost::mutex::scoped_lock lm(_mutex);
+		return _video_is_hdr;
+	}
 
 	void set_burnt_subtitle_language(boost::optional<dcp::LanguageTag> language);
 
@@ -267,6 +274,7 @@ private:
 	PixelQuanta _pixel_quanta;
 	boost::optional<dcp::LanguageTag> _burnt_subtitle_language;
 	bool _has_alpha = false;
+	bool _video_is_hdr = false;
 };
 
 

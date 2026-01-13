@@ -662,7 +662,7 @@ Writer::finish()
 		cpl->set_sign_language_video_language(*film()->sign_language_video_language());
 	}
 	// [ZHANGXIN] Set DCI HDR Metadata (Signature Safe)
-	if (film()->enable_zhangxin_hdr()) {
+	if (film()->enable_neural_hdr()) {
 		cpl->set_dci_hdr_eotf("ST 2084");
 	}
 

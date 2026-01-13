@@ -128,8 +128,8 @@ public:
 	std::string dcp_name(bool if_created_now = false) const;
 
     // [ZHANGXIN] HDR
-    bool enable_zhangxin_hdr() const {
-        return _enable_zhangxin_hdr;
+    bool enable_neural_hdr() const {
+        return _enable_neural_hdr;
     }
     
     float hdr_white_nits() const {
@@ -451,7 +451,7 @@ public:
 	void set_audio_frame_rate(int rate);
     
     // [ZHANGXIN] HDR
-    void set_enable_zhangxin_hdr(bool e);
+    void set_enable_neural_hdr(bool e);
     void set_hdr_white_nits(float n);
 
 	void add_ffoc_lfoc(Markers& markers) const;
@@ -592,7 +592,7 @@ private:
 	int _audio_frame_rate = 48000;
     
     // [ZHANGXIN] HDR
-    bool _enable_zhangxin_hdr = false;
+    bool _enable_neural_hdr = false;
     float _hdr_white_nits = 300.0f;
 
 	int _state_version;

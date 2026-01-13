@@ -469,6 +469,9 @@ DCPPanel::film_changed(FilmProperty p)
 	case FilmProperty::REENCODE_J2K:
 		checked_set(_reencode_j2k, _film->reencode_j2k());
 		break;
+	case FilmProperty::ENABLE_NEURAL_HDR:
+		checked_set(_neural_hdr, _film->enable_neural_hdr());
+		break;
 	case FilmProperty::INTEROP:
 		update_standards();
 		set_standard();
@@ -659,6 +662,7 @@ DCPPanel::set_film(shared_ptr<Film> film)
 	film_changed(FilmProperty::REEL_TYPE);
 	film_changed(FilmProperty::REEL_LENGTH);
 	film_changed(FilmProperty::REENCODE_J2K);
+	film_changed(FilmProperty::ENABLE_NEURAL_HDR);
 	film_changed(FilmProperty::AUDIO_LANGUAGE);
 	film_changed(FilmProperty::AUDIO_FRAME_RATE);
 	film_changed(FilmProperty::LIMIT_TO_SMPTE_BV20);
@@ -788,6 +792,17 @@ DCPPanel::reencode_j2k_changed()
 
 
 void
+DCPPanel::neural_hdr_changed()
+{
+	if (!_film) {
+		return;
+	}
+
+	_film->set_enable_neural_hdr(_neural_hdr->GetValue());
+}
+
+
+void
 DCPPanel::config_changed(Config::Property p)
 {
 	VideoEncoding const encoding = _film ? _film->video_encoding() : VideoEncoding::JPEG2000;
@@ -857,6 +872,8 @@ DCPPanel::make_video_panel()
 
 	_reencode_j2k = new CheckBox(panel, _("Re-encode JPEG2000 data from input"));
 
+	_neural_hdr = new CheckBox(panel, _("Enable Neural HDR Processing"));
+
 	_container->Bind	(wxEVT_CHOICE,	  boost::bind(&DCPPanel::container_changed, this));
 	_frame_rate_choice->Bind(wxEVT_CHOICE,	  boost::bind(&DCPPanel::frame_rate_choice_changed, this));
 	_frame_rate_spin->Bind  (wxEVT_SPINCTRL, boost::bind(&DCPPanel::frame_rate_spin_changed, this));
@@ -867,6 +884,7 @@ DCPPanel::make_video_panel()
 	_resolution->Bind       (wxEVT_CHOICE,   boost::bind(&DCPPanel::resolution_changed, this));
 	_three_d->bind(&DCPPanel::three_d_changed, this);
 	_reencode_j2k->bind(&DCPPanel::reencode_j2k_changed, this);
+	_neural_hdr->bind(&DCPPanel::neural_hdr_changed, this);
 
 	for (auto i: Config::instance()->allowed_dcp_frame_rates()) {
 		_frame_rate_choice->add_entry(boost::lexical_cast<string>(i));
@@ -924,6 +942,8 @@ DCPPanel::add_video_panel_to_grid()
 	_video_grid->Add(s, wxGBPosition(r, 1), wxDefaultSpan);
 	++r;
 	_video_grid->Add(_reencode_j2k, wxGBPosition(r, 0), wxGBSpan(1, 2));
+	++r;
+	_video_grid->Add(_neural_hdr, wxGBPosition(r, 0), wxGBSpan(1, 2));
 }
 
 

@@ -5266,3 +5266,19 @@ msgstr "是"
 
 #~ msgid "video"
 #~ msgstr "视频"
+
+# Neural HDR Translations
+msgid "Neural HDR"
+msgstr "神经网络 HDR"
+
+msgid "Enable Neural HDR Processing"
+msgstr "启用神经网络 HDR 处理"
+
+msgid "Model Path"
+msgstr "模型路径"
+
+msgid "Select ONNX Model"
+msgstr "选择 ONNX 模型"
+
+msgid "Enable Hue Lock Strategy"
+msgstr "启用色相锁定策略"

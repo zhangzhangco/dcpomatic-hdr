@@ -1,8 +1,8 @@
 /*
-    Copyright (C) 2026 zhangxin
+    Copyright (C) 2026 neural
 */
 
-#include "zhangxin_hdr.h"
+#include "neural_hdr.h"
 #include "dcpomatic_assert.h"
 #include "config.h"
 #include <cmath>
@@ -27,7 +27,7 @@ struct OrtContext {
     std::unique_ptr<Ort::Session> session;
     Ort::RunOptions run_options;
     
-    OrtContext() : env(ORT_LOGGING_LEVEL_WARNING, "ZhangxinHDR") {
+    OrtContext() : env(ORT_LOGGING_LEVEL_WARNING, "NeuralHDR") {
         run_options = Ort::RunOptions{nullptr};
     }
 };
@@ -40,7 +40,7 @@ static void init_ort_session(const std::string& model_path) {
     if (g_ort_ctx && g_ort_ctx->session) return; // Already initialized
 
     if (model_path.empty()) {
-        std::cerr << "[ZHANGXIN_HDR] Error: Model path is empty!" << std::endl;
+        std::cerr << "[NEURAL_HDR] Error: Model path is empty!" << std::endl;
         return;
     }
 
@@ -51,22 +51,22 @@ static void init_ort_session(const std::string& model_path) {
         session_options.SetIntraOpNumThreads(4); 
         session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        std::cout << "[ZHANGXIN_HDR] Loading ONNX model from " << model_path << " ..." << std::endl;
+        std::cout << "[NEURAL_HDR] Loading ONNX model from " << model_path << " ..." << std::endl;
         g_ort_ctx->session.reset(new Ort::Session(g_ort_ctx->env, model_path.c_str(), session_options));
-        std::cout << "[ZHANGXIN_HDR] Model loaded successfully." << std::endl;
+        std::cout << "[NEURAL_HDR] Model loaded successfully." << std::endl;
     } catch (const Ort::Exception& e) {
-        std::cerr << "[ZHANGXIN_HDR] ORT Exception: " << e.what() << std::endl;
+        std::cerr << "[NEURAL_HDR] ORT Exception: " << e.what() << std::endl;
         g_ort_ctx.reset(); 
     }
 }
 
-static float decode_transfer(float v, ZhangxinHDR::TransferFunction tf) {
+static float decode_transfer(float v, NeuralHDR::TransferFunction tf) {
     // Anti-NaN clipping in encoding domain.
     // NOTE: We clip negative values here for safety.
     v = std::max(0.0f, std::min(v, 1.0f));
     
     switch (tf) {
-        case ZhangxinHDR::TransferFunction::REC709_SCENE_LINEAR: {
+        case NeuralHDR::TransferFunction::REC709_SCENE_LINEAR: {
             // Rec.709 inverse OETF (Scene Linear)
             // L = V/4.5                   if V < 0.081
             // L = ((V+0.099)/1.099)^(1/0.45) otherwise
@@ -80,9 +80,9 @@ static float decode_transfer(float v, ZhangxinHDR::TransferFunction tf) {
             if (v < Vt) return v / k;
             else return std::pow((v + a) / b, gamma); 
         }
-        case ZhangxinHDR::TransferFunction::GAMMA_24:
+        case NeuralHDR::TransferFunction::GAMMA_24:
             return std::pow(v, 2.4f);
-        case ZhangxinHDR::TransferFunction::GAMMA_26:
+        case NeuralHDR::TransferFunction::GAMMA_26:
             return std::pow(v, 2.6f);
         default:
             return std::pow(v, 2.4f);
@@ -121,9 +121,9 @@ static const float M_P3_XYZ[9] = {
 
 
 void
-ZhangxinHDR::log_stats(const string& tag, const Stats& s) {
+NeuralHDR::log_stats(const string& tag, const Stats& s) {
     if (s.y_max >= 0.0f) {
-        std::cout << "[ZHANGXIN_HDR] " << tag << " (Nits): "
+        std::cout << "[NEURAL_HDR] " << tag << " (Nits): "
                   << "Y_min=" << s.y_min << " "
                   << "Y_max=" << s.y_max << " "
                   << "Y_median=" << s.y_median << " "
@@ -131,36 +131,36 @@ ZhangxinHDR::log_stats(const string& tag, const Stats& s) {
     }
 }
 
-ZhangxinHDR::Config
-ZhangxinHDR::Config::load_from_config()
+NeuralHDR::Config
+NeuralHDR::Config::load_from_config()
 {
     Config c;
     
     auto global_config = ::Config::instance();
     
-    if (global_config->zhangxin_hdr_enable()) {
-        c.enable = *global_config->zhangxin_hdr_enable();
+    if (global_config->neural_hdr_enable()) {
+        c.enable = *global_config->neural_hdr_enable();
     }
     
-    if (global_config->zhangxin_hdr_model_path()) {
-        c.model_path = *global_config->zhangxin_hdr_model_path();
+    if (global_config->neural_hdr_model_path()) {
+        c.model_path = *global_config->neural_hdr_model_path();
     }
     
-    if (global_config->zhangxin_hdr_hue_lock()) {
-        c.hue_lock = *global_config->zhangxin_hdr_hue_lock();
+    if (global_config->neural_hdr_hue_lock()) {
+        c.hue_lock = *global_config->neural_hdr_hue_lock();
     }
     
     // Validation
     if (c.enable && c.model_path.empty()) {
-        std::cerr << "[ZHANGXIN_HDR] Warning: HDR enabled but model path not set. "
-                  << "Please configure it in Edit -> Preferences -> Zhangxin HDR." << std::endl;
+        std::cerr << "[NEURAL_HDR] Warning: HDR enabled but model path not set. "
+                  << "Please configure it in Edit -> Preferences -> Neural HDR." << std::endl;
     }
     
     return c;
 }
 
 shared_ptr<Image>
-ZhangxinHDR::process(shared_ptr<const Image> image, Config config)
+NeuralHDR::process(shared_ptr<const Image> image, Config config)
 {
     if (!config.enable) {
         return make_shared<Image>(*image);
@@ -307,8 +307,8 @@ ZhangxinHDR::process(shared_ptr<const Image> image, Config config)
 
 // === New PQ-Ready HDR Pipeline ===
 // NOTE: This HDR pipeline is EXPERIMENTAL until MXF TransferCharacteristic UL is set (DCI HDR Addendum).
-ZhangxinHDR::HDRXYZResult
-ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
+NeuralHDR::HDRXYZResult
+NeuralHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
 {
     HDRXYZResult result;
     DCPOMATIC_ASSERT(image->pixel_format() == AV_PIX_FMT_RGB48LE);
@@ -330,7 +330,7 @@ ZhangxinHDR::process_to_hdr_xyz(shared_ptr<const Image> image, Config config)
     
     // If Init failed, throw error. We do NOT use fallback in production or strict testing.
     if (!g_ort_ctx || !g_ort_ctx->session) {
-        throw std::runtime_error("[ZHANGXIN_HDR] Critical Error: HDR Model not loaded! Configure model path in Edit -> Preferences -> Zhangxin HDR.");
+        throw std::runtime_error("[NEURAL_HDR] Critical Error: HDR Model not loaded! Configure model path in Edit -> Preferences -> Neural HDR.");
     }
 
 

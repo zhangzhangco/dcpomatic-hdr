@@ -202,6 +202,10 @@ public:
 
 	void add_fonts(std::shared_ptr<TextContent> content);
 
+	bool video_is_hdr() const {
+		return _video_is_hdr;
+	}
+
 private:
 	boost::optional<double> _video_frame_rate;
 	boost::optional<dcp::Size> _video_size;
@@ -241,6 +245,7 @@ private:
 	bool _has_atmos = false;
 	Frame _atmos_length = 0;
 	dcp::Fraction _atmos_edit_rate;
+	bool _video_is_hdr = false;
 	EnumIndexedVector<bool, TextType> _has_non_zero_entry_point;
 	VideoRange _video_range = VideoRange::FULL;
 

@@ -1481,16 +1481,16 @@ private:
 };
 
 
-class ZhangxinHDRPage : public preferences::Page
+class NeuralHDRPage : public preferences::Page
 {
 public:
-	ZhangxinHDRPage(wxSize panel_size, int border)
+	NeuralHDRPage(wxSize panel_size, int border)
 		: Page(panel_size, border)
 	{}
 
 	wxString GetName() const override
 	{
-		return _("Zhangxin HDR");
+		return _("Neural HDR");
 	}
 
 #ifdef DCPOMATIC_OSX
@@ -1507,50 +1507,50 @@ private:
 		table->AddGrowableCol(1, 1);
 		_panel->GetSizer()->Add(table, 1, wxALL | wxEXPAND, _border);
 
-		_enable = new CheckBox(_panel, _("Enable Zhangxin HDR Processing"));
+		_enable = new CheckBox(_panel, _("Enable Neural HDR Processing"));
 		table->Add(_enable, 1, wxEXPAND | wxALL);
 		table->AddSpacer(0);
 
 		add_label_to_sizer(table, _panel, _("Model Path"), true, 0, wxLEFT | wxRIGHT | wxALIGN_CENTRE_VERTICAL);
-		_model_path = new FilePickerCtrl(_panel, _("Select ONNX Model"), "*.onnx", true, false, "ZhangxinHDRModelPath");
+		_model_path = new FilePickerCtrl(_panel, _("Select ONNX Model"), "*.onnx", true, false, "NeuralHDRModelPath");
 		table->Add(_model_path, 1, wxEXPAND | wxALL);
 
 		_hue_lock = new CheckBox(_panel, _("Enable Hue Lock Strategy"));
 		table->Add(_hue_lock, 1, wxEXPAND | wxALL);
 		table->AddSpacer(0);
 
-		_enable->bind(&ZhangxinHDRPage::enable_changed, this);
-		_model_path->Bind(wxEVT_FILEPICKER_CHANGED, boost::bind(&ZhangxinHDRPage::model_path_changed, this));
-		_hue_lock->bind(&ZhangxinHDRPage::hue_lock_changed, this);
+		_enable->bind(&NeuralHDRPage::enable_changed, this);
+		_model_path->Bind(wxEVT_FILEPICKER_CHANGED, boost::bind(&NeuralHDRPage::model_path_changed, this));
+		_hue_lock->bind(&NeuralHDRPage::hue_lock_changed, this);
 	}
 
 	void config_changed() override
 	{
 		auto config = Config::instance();
-		checked_set(_enable, config->zhangxin_hdr_enable().get_value_or(false));
-		if (config->zhangxin_hdr_model_path()) {
-			_model_path->set_path(boost::filesystem::path(*config->zhangxin_hdr_model_path()));
+		checked_set(_enable, config->neural_hdr_enable().get_value_or(false));
+		if (config->neural_hdr_model_path()) {
+			_model_path->set_path(boost::filesystem::path(*config->neural_hdr_model_path()));
 		}
-		checked_set(_hue_lock, config->zhangxin_hdr_hue_lock().get_value_or(false));
+		checked_set(_hue_lock, config->neural_hdr_hue_lock().get_value_or(false));
 	}
 
 	void enable_changed()
 	{
-		Config::instance()->set_zhangxin_hdr_enable(_enable->GetValue());
+		Config::instance()->set_neural_hdr_enable(_enable->GetValue());
 	}
 
 	void model_path_changed()
 	{
 		if (_model_path->path()) {
-			Config::instance()->set_zhangxin_hdr_model_path(_model_path->path()->string());
+			Config::instance()->set_neural_hdr_model_path(_model_path->path()->string());
 		} else {
-			Config::instance()->set_zhangxin_hdr_model_path("");
+			Config::instance()->set_neural_hdr_model_path("");
 		}
 	}
 
 	void hue_lock_changed()
 	{
-		Config::instance()->set_zhangxin_hdr_hue_lock(_hue_lock->GetValue());
+		Config::instance()->set_neural_hdr_hue_lock(_hue_lock->GetValue());
 	}
 
 	CheckBox* _enable;
@@ -1592,6 +1592,6 @@ create_full_config_dialog()
 	e->AddPage(new IdentifiersPage(ps, border));
 	e->AddPage(new NonStandardPage(ps, border));
 	e->AddPage(new AdvancedPage(ps, border));
-	e->AddPage(new ZhangxinHDRPage(ps, border));
+	e->AddPage(new NeuralHDRPage(ps, border));
 	return e;
 }

@@ -615,6 +615,12 @@ VideoContent::set_burnt_subtitle_language(boost::optional<dcp::LanguageTag> lang
 	maybe_set(_burnt_subtitle_language, language, VideoContentProperty::BURNT_SUBTITLE_LANGUAGE);
 }
 
+void
+VideoContent::set_video_is_hdr(bool h)
+{
+	maybe_set(_video_is_hdr, h, VideoContentProperty::VIDEO_IS_HDR);
+}
+
 
 void
 VideoContent::take_settings_from(shared_ptr<const VideoContent> c)
