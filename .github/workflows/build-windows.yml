@@ -98,7 +98,9 @@ jobs:
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
       run: |
-        ls -1 /mingw64/lib/libboost_system* || true
+        echo "Listing boost libs:"
+        ls /mingw64/lib/ | grep boost | head -n 20 || echo "gls failed"
+        find /mingw64/lib -maxdepth 1 -name "libboost_system*" || echo "find failed"
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
         sed -i "s/load('msvc')/load('g++')/g" wscript
