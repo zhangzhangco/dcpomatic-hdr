@@ -72,7 +72,7 @@ jobs:
     # ---- Build asdcplib ----
     - name: Build asdcplib
       run: |
-        git clone https://github.com/cth103/asdcplib.git asdcplib
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
         ./waf configure --prefix=/usr/local
         ./waf build
@@ -185,7 +185,7 @@ jobs:
     # ---- Build asdcplib ----
     - name: Build asdcplib (macOS)
       run: |
-        git clone https://github.com/cth103/asdcplib.git asdcplib
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
         ./waf configure --prefix=/usr/local
         ./waf build
@@ -304,7 +304,7 @@ jobs:
     # ---- Build asdcplib ----
     - name: Build asdcplib (Windows)
       run: |
-        git clone https://github.com/cth103/asdcplib.git asdcplib
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
         ./waf configure --prefix=/mingw64
         ./waf build
