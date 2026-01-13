@@ -224,7 +224,7 @@ jobs:
       run: |
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        ./waf configure --prefix=/usr/local
+        CXXFLAGS="-Wno-deprecated-declarations" ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -233,7 +233,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        ./waf configure --prefix=/usr/local
+        CXXFLAGS="-Wno-deprecated-declarations" ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
 
@@ -243,7 +243,7 @@ jobs:
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
-        ./waf configure --prefix=/usr/local --disable-tests --disable-examples
+        CXXFLAGS="-Wno-deprecated-declarations" ./waf configure --prefix=/usr/local --disable-tests --disable-examples
         ./waf build
         sudo ./waf install
 
