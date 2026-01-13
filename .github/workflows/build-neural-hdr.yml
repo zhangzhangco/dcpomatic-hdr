@@ -137,6 +137,7 @@ jobs:
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
         git checkout ${{ env.LIBSUB_VERSION }} || true
+        git tag -f v1.6.58
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
@@ -254,6 +255,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
+        git tag -f v1.6.58
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
@@ -385,6 +387,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
+        git tag -f v1.6.58
         ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
