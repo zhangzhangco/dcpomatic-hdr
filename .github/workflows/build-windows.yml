@@ -62,6 +62,7 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-ffmpeg
           mingw-w64-x86_64-rtaudio
+          mingw-w64-x86_64-python
           git patch python3 autoconf automake libtool pkg-config
 
     - name: Checkout DCP-o-matic
@@ -72,16 +73,20 @@ jobs:
     # ---- Build asdcplib ----
     - name: Build asdcplib (Windows)
       run: |
+        echo "Diagnostics:"
         which g++
         g++ --version
+        which ar
+        which python3
+        
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
         export CXX=g++
         export CC=gcc
         export AR=ar
-        ./waf configure --prefix=/mingw64
-        ./waf build
-        ./waf install
+        python3 waf configure --prefix=/mingw64
+        python3 waf build
+        python3 waf install
 
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
@@ -91,9 +96,9 @@ jobs:
         export CXX=g++
         export CC=gcc
         export AR=ar
-        ./waf configure --prefix=/mingw64
-        ./waf build
-        ./waf install
+        python3 waf configure --prefix=/mingw64
+        python3 waf build
+        python3 waf install
 
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp with HDR Patch (Windows)
@@ -105,9 +110,9 @@ jobs:
         export CXX=g++
         export CC=gcc
         export AR=ar
-        ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
-        ./waf build
-        ./waf install
+        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples
+        python3 waf build
+        python3 waf install
 
     # ---- Build libsub ----
     - name: Build libsub (Windows)
@@ -118,9 +123,9 @@ jobs:
         export CXX=g++
         export CC=gcc
         export AR=ar
-        ./waf configure --prefix=/mingw64
-        ./waf build
-        ./waf install
+        python3 waf configure --prefix=/mingw64
+        python3 waf build
+        python3 waf install
 
     # ---- Build leqm-nrt ----
     - name: Build leqm-nrt (Windows)
@@ -132,9 +137,9 @@ jobs:
         export CXX=g++
         export CC=gcc
         export AR=ar
-        ./waf configure --prefix=/mingw64
-        ./waf build
-        ./waf install
+        python3 waf configure --prefix=/mingw64
+        python3 waf build
+        python3 waf install
 
     # ---- Setup ONNX Runtime ----
     - name: Setup ONNX Runtime (Windows)
@@ -155,8 +160,8 @@ jobs:
         export CXX=g++
         export CC=gcc
         export AR=ar
-        ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
-        ./waf build -j$(nproc)
+        python3 waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
+        python3 waf build -j$(nproc)
 
     - name: Package Windows Build
       shell: pwsh
