@@ -87,6 +87,7 @@ jobs:
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        export CXXFLAGS="-DKM_WIN32 -Wno-deprecated-declarations"
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
