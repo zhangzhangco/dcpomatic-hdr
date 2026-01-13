@@ -98,12 +98,18 @@ jobs:
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
       run: |
+        ls -1 /mingw64/lib/libboost_system* || true
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
         sed -i "s/load('msvc')/load('g++')/g" wscript
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        sed -i "s/lib='boost_system'/lib='boost_system-mt'/g" wscript
+        sed -i "s/lib='boost_filesystem'/lib='boost_filesystem-mt'/g" wscript
+        sed -i "s/lib='boost_date_time'/lib='boost_date_time-mt'/g" wscript
+        sed -i "s/lib='boost_thread'/lib='boost_thread-mt'/g" wscript
+        sed -i "s/lib='boost_regex'/lib='boost_regex-mt'/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -122,6 +128,11 @@ jobs:
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        sed -i "s/lib='boost_system'/lib='boost_system-mt'/g" wscript
+        sed -i "s/lib='boost_filesystem'/lib='boost_filesystem-mt'/g" wscript
+        sed -i "s/lib='boost_date_time'/lib='boost_date_time-mt'/g" wscript
+        sed -i "s/lib='boost_thread'/lib='boost_thread-mt'/g" wscript
+        sed -i "s/lib='boost_regex'/lib='boost_regex-mt'/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -139,6 +150,11 @@ jobs:
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        sed -i "s/lib='boost_system'/lib='boost_system-mt'/g" wscript
+        sed -i "s/lib='boost_filesystem'/lib='boost_filesystem-mt'/g" wscript
+        sed -i "s/lib='boost_date_time'/lib='boost_date_time-mt'/g" wscript
+        sed -i "s/lib='boost_thread'/lib='boost_thread-mt'/g" wscript
+        sed -i "s/lib='boost_regex'/lib='boost_regex-mt'/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
@@ -184,6 +200,11 @@ jobs:
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        sed -i "s/lib='boost_system'/lib='boost_system-mt'/g" wscript
+        sed -i "s/lib='boost_filesystem'/lib='boost_filesystem-mt'/g" wscript
+        sed -i "s/lib='boost_date_time'/lib='boost_date_time-mt'/g" wscript
+        sed -i "s/lib='boost_thread'/lib='boost_thread-mt'/g" wscript
+        sed -i "s/lib='boost_regex'/lib='boost_regex-mt'/g" wscript
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe

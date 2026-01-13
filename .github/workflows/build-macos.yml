@@ -186,9 +186,14 @@ jobs:
     - name: Configure and Build DCP-o-matic (macOS)
       run: |
         cd dcpomatic
-        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$(brew --prefix icu4c)/lib/pkgconfig:$PKG_CONFIG_PATH"
         export LDFLAGS="-L/usr/local/lib -L$(brew --prefix)/lib"
         export CPPFLAGS="-I/usr/local/include -I$(brew --prefix)/include"
+        sed -i '' "s/lib='boost_system'/lib='boost_system-mt'/g" wscript
+        sed -i '' "s/lib='boost_filesystem'/lib='boost_filesystem-mt'/g" wscript
+        sed -i '' "s/lib='boost_date_time'/lib='boost_date_time-mt'/g" wscript
+        sed -i '' "s/lib='boost_thread'/lib='boost_thread-mt'/g" wscript
+        sed -i '' "s/lib='boost_regex'/lib='boost_regex-mt'/g" wscript
         ./waf configure --prefix=/usr/local --disable-tests
         ./waf build -j$(sysctl -n hw.ncpu)
 
