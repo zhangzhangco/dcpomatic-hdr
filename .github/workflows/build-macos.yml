@@ -41,7 +41,7 @@ jobs:
         brew install \
           boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
           pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
-          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glibmm glibmm@2.4 libsigc++@2
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glib
 
     # ---- Build asdcplib ----
     - name: Build asdcplib (macOS)
@@ -57,6 +57,30 @@ jobs:
         ./waf build
         sudo ./waf install
 
+    # ---- Build libsigc++ 2.10 (Manual build for macOS) ----
+    - name: Build libsigc++ 2.10 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/libsigc++/2.10/libsigc++-2.10.8.tar.xz
+        tar xf libsigc++-2.10.8.tar.xz
+        cd libsigc++-2.10.8
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+    # ---- Build glibmm 2.66 (Manual build for macOS) ----
+    - name: Build glibmm 2.66 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/glibmm/2.66/glibmm-2.66.6.tar.xz
+        tar xf glibmm-2.66.6.tar.xz
+        cd glibmm-2.66.6
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
     # ---- Build libxml++ 2.6 (Manual build for macOS) ----
     - name: Build libxml++ 2.6 (macOS)
       run: |
@@ -64,11 +88,9 @@ jobs:
         tar xf libxml++-2.40.1.tar.xz
         cd libxml++-2.40.1
         PREFIX=$(brew --prefix)
-        GLIBMM_PREFIX=$(brew --prefix glibmm@2.4)
-        SIGCPP_PREFIX=$(brew --prefix libsigc++@2)
-        export CXXFLAGS="-I$PREFIX/include -I$GLIBMM_PREFIX/include -I$SIGCPP_PREFIX/include -std=c++11"
-        export LDFLAGS="-L$PREFIX/lib -L$GLIBMM_PREFIX/lib -L$SIGCPP_PREFIX/lib"
-        export PKG_CONFIG_PATH="$GLIBMM_PREFIX/lib/pkgconfig:$SIGCPP_PREFIX/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         ./configure --prefix=/usr/local
         make -j$(sysctl -n hw.ncpu)
         sudo make install
