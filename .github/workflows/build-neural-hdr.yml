@@ -1,0 +1,391 @@
+# ============================================================================
+# DCP-o-matic Neural HDR Build Pipeline
+# Author: zhangxin
+# 
+# This workflow builds DCP-o-matic with Neural HDR support for Linux, Windows, and macOS.
+# It automatically patches libdcp with HDR metadata support and integrates ONNX Runtime.
+# ============================================================================
+
+name: Build Neural HDR
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug build'
+        required: false
+        default: 'false'
+
+env:
+  LIBDCP_VERSION: v1.10.45
+  LIBSUB_VERSION: v1.6.58
+  LIBCXML_VERSION: v0.17.7
+  ASDCPLIB_VERSION: carl-2.13.4-dcpomatic
+  ONNXRUNTIME_VERSION: 1.19.2
+
+jobs:
+  # ============================================================================
+  # Linux Build (Ubuntu 22.04)
+  # ============================================================================
+  build-linux:
+    name: Linux (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        path: dcpomatic
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential g++ pkg-config python3 \
+          libboost-all-dev libwxgtk3.0-gtk3-dev \
+          libxml++2.6-dev libxmlsec1-dev libxmlsec1-openssl \
+          libssl-dev libcurl4-openssl-dev libzip-dev \
+          libssh-dev libpangomm-1.4-dev libcairomm-1.0-dev \
+          libsndfile1-dev libsamplerate0-dev libpulse-dev libasound2-dev \
+          libicu-dev nettle-dev libx264-dev libsqlite3-dev \
+          libxerces-c-dev libhpdf-dev libfmt-dev libnanomsg-dev \
+          libjpeg-dev libpng-dev libtiff-dev \
+          autoconf automake libtool cmake gettext
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib
+      run: |
+        git clone https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Build libcxml ----
+    - name: Build libcxml
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        git checkout ${{ env.LIBCXML_VERSION }} || true
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp (with HDR Patch)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        git checkout ${{ env.LIBDCP_VERSION }} || true
+        
+        # Apply HDR Integration Patch
+        echo "Applying HDR patch..."
+        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        
+        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Build libsub ----
+    - name: Build libsub
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        git checkout ${{ env.LIBSUB_VERSION }} || true
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime
+      run: |
+        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        tar -xzf onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        sudo cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
+        sudo cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
+        sudo ldconfig
+        
+        # Also copy to deps folder for wscript compatibility
+        mkdir -p dcpomatic/deps/onnxruntime
+        cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic
+      run: |
+        cd dcpomatic
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build -j$(nproc)
+
+    # ---- Package Artifacts ----
+    - name: Package Linux Build
+      run: |
+        mkdir -p artifacts/linux
+        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_cli artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_batch artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_kdm artifacts/linux/
+        # Copy ONNX Runtime library
+        cp /usr/local/lib/libonnxruntime.so* artifacts/linux/
+        # Create tarball
+        cd artifacts
+        tar -czvf dcpomatic-neural-hdr-linux-x64.tar.gz linux/
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-linux-x64
+        path: artifacts/dcpomatic-neural-hdr-linux-x64.tar.gz
+
+  # ============================================================================
+  # macOS Build
+  # ============================================================================
+  build-macos:
+    name: macOS (Intel + ARM)
+    runs-on: macos-13
+    
+    steps:
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        path: dcpomatic
+
+    - name: Install Dependencies via Homebrew
+      run: |
+        brew update
+        brew install \
+          boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
+          pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib (macOS)
+      run: |
+        git clone https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libcxml ----
+    - name: Build libcxml (macOS)
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp with HDR Patch (macOS)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libsub ----
+    - name: Build libsub (macOS)
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime (macOS)
+      run: |
+        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        tar -xzf onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        sudo cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
+        sudo cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
+        
+        mkdir -p dcpomatic/deps/onnxruntime
+        cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic (macOS)
+      run: |
+        cd dcpomatic
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LDFLAGS="-L/usr/local/lib -L$(brew --prefix)/lib"
+        export CPPFLAGS="-I/usr/local/include -I$(brew --prefix)/include"
+        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build -j$(sysctl -n hw.ncpu)
+
+    - name: Package macOS Build
+      run: |
+        mkdir -p artifacts/macos
+        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/macos/
+        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/macos/
+        cp /usr/local/lib/libonnxruntime* artifacts/macos/ || true
+        cd artifacts
+        tar -czvf dcpomatic-neural-hdr-macos-x64.tar.gz macos/
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-macos-x64
+        path: artifacts/dcpomatic-neural-hdr-macos-x64.tar.gz
+
+  # ============================================================================
+  # Windows Build (MSYS2)
+  # ============================================================================
+  build-windows:
+    name: Windows (64-bit)
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-boost
+          mingw-w64-x86_64-wxwidgets3.2-msw
+          mingw-w64-x86_64-libxml++2.6
+          mingw-w64-x86_64-xmlsec
+          mingw-w64-x86_64-openssl
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-libzip
+          mingw-w64-x86_64-libssh
+          mingw-w64-x86_64-pango
+          mingw-w64-x86_64-cairo
+          mingw-w64-x86_64-libsndfile
+          mingw-w64-x86_64-libsamplerate
+          mingw-w64-x86_64-icu
+          mingw-w64-x86_64-nettle
+          mingw-w64-x86_64-x264
+          mingw-w64-x86_64-sqlite3
+          mingw-w64-x86_64-xerces-c
+          mingw-w64-x86_64-libharu
+          mingw-w64-x86_64-fmt
+          mingw-w64-x86_64-cmake
+          git patch python3 autoconf automake libtool pkg-config
+
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        path: dcpomatic
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib (Windows)
+      run: |
+        git clone https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Build libcxml ----
+    - name: Build libcxml (Windows)
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp with HDR Patch (Windows)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        ./waf configure --prefix=/mingw64 --disable-tests
+        ./waf build
+        ./waf install
+
+    # ---- Build libsub ----
+    - name: Build libsub (Windows)
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime (Windows)
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}.zip" -OutFile "onnxruntime.zip"
+        Expand-Archive -Path onnxruntime.zip -DestinationPath .
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\include\*" -Destination "C:\msys64\mingw64\include\" -Recurse -Force
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib\*" -Destination "C:\msys64\mingw64\lib\" -Recurse -Force
+        New-Item -ItemType Directory -Force -Path "dcpomatic\deps\onnxruntime"
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\include" -Destination "dcpomatic\deps\onnxruntime\" -Recurse
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib" -Destination "dcpomatic\deps\onnxruntime\" -Recurse
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic (Windows)
+      run: |
+        cd dcpomatic
+        ./waf configure --prefix=/mingw64 --disable-tests
+        ./waf build -j$(nproc)
+
+    - name: Package Windows Build
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path artifacts\windows
+        Copy-Item dcpomatic\build\src\tools\*.exe artifacts\windows\
+        Copy-Item "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib\*.dll" artifacts\windows\
+        Compress-Archive -Path artifacts\windows\* -DestinationPath artifacts\dcpomatic-neural-hdr-win-x64.zip
+
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-win-x64
+        path: artifacts/dcpomatic-neural-hdr-win-x64.zip
+
+  # ============================================================================
+  # Create Release (on tag push)
+  # ============================================================================
+  release:
+    name: Create Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/dcpomatic-neural-hdr-linux-x64/*.tar.gz
+          artifacts/dcpomatic-neural-hdr-macos-x64/*.tar.gz
+          artifacts/dcpomatic-neural-hdr-win-x64/*.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
