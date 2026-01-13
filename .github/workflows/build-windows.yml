@@ -71,20 +71,22 @@ jobs:
         path: dcpomatic
 
     # ---- Build asdcplib ----
+    # ---- Build asdcplib ----
     - name: Build asdcplib (Windows)
       run: |
         echo "Diagnostics:"
         which g++
         g++ --version
-        which ar
-        which python3
+        echo "int main() { return 0; }" > test.cpp
+        g++ test.cpp -o test.exe
+        ./test.exe && echo "Basic compilation works"
         
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
         export CXX=g++
         export CC=gcc
         export AR=ar
-        python3 waf configure --prefix=/mingw64
+        python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
         python3 waf build
         python3 waf install
 
