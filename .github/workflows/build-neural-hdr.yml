@@ -154,8 +154,8 @@ jobs:
   # macOS Build
   # ============================================================================
   build-macos:
-    name: macOS (Intel + ARM)
-    runs-on: macos-13
+    name: macOS (ARM64/M1)
+    runs-on: macos-14
     
     steps:
     - name: Checkout DCP-o-matic
@@ -211,14 +211,14 @@ jobs:
     # ---- Setup ONNX Runtime ----
     - name: Setup ONNX Runtime (macOS)
       run: |
-        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}.tgz
-        tar -xzf onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}.tgz
-        sudo cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
-        sudo cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
+        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        tar -xzf onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        sudo cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
+        sudo cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
         
         mkdir -p dcpomatic/deps/onnxruntime
-        cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
-        cp -r onnxruntime-osx-x86_64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
 
     # ---- Build DCP-o-matic ----
     - name: Configure and Build DCP-o-matic (macOS)
