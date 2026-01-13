@@ -1,0 +1,171 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug build'
+        required: false
+        default: 'false'
+
+env:
+  LIBDCP_VERSION: v1.10.45
+  LIBSUB_VERSION: v1.6.58
+  LIBCXML_VERSION: v0.17.7
+  ASDCPLIB_VERSION: carl-2.13.4-dcpomatic
+  ONNXRUNTIME_VERSION: 1.19.2
+
+jobs:
+  # ============================================================================
+  # macOS Build
+  # ============================================================================
+  build-macos:
+    name: macOS (ARM64/M1)
+    runs-on: macos-14
+    
+    steps:
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        path: dcpomatic
+
+    - name: Install Dependencies via Homebrew
+      run: |
+        brew update
+        brew install \
+          boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
+          pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glibmm
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib (macOS)
+      run: |
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libxml++ 2.6 (Manual build for macOS) ----
+    - name: Build libxml++ 2.6 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/libxml++/2.40/libxml++-2.40.1.tar.xz
+        tar xf libxml++-2.40.1.tar.xz
+        cd libxml++-2.40.1
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+    # ---- Build libcxml ----
+    - name: Build libcxml (macOS)
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp with HDR Patch (macOS)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        git tag -f v1.10.0
+        # Apply patch for neural HDR integration
+        git apply ../dcpomatic/libdcp_hdr_integration.patch
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libsub ----
+    - name: Build libsub (macOS)
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        git tag -f v1.6.58
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt (macOS)
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime (macOS)
+      run: |
+        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        tar -xzf onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        sudo cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
+        sudo cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
+        
+        mkdir -p dcpomatic/deps/onnxruntime
+        cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic (macOS)
+      run: |
+        cd dcpomatic
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LDFLAGS="-L/usr/local/lib -L$(brew --prefix)/lib"
+        export CPPFLAGS="-I/usr/local/include -I$(brew --prefix)/include"
+        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build -j$(sysctl -n hw.ncpu)
+
+    - name: Package macOS Build
+      run: |
+        mkdir -p artifacts/macos
+        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/macos/
+        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/macos/
+        cp /usr/local/lib/libonnxruntime* artifacts/macos/ || true
+        cd artifacts
+        tar -czvf dcpomatic-neural-hdr-macos-x64.tar.gz macos/
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-macos-x64
+        path: artifacts/dcpomatic-neural-hdr-macos-x64.tar.gz

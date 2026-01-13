@@ -1,0 +1,192 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug build'
+        required: false
+        default: 'false'
+
+env:
+  LIBDCP_VERSION: v1.10.45
+  LIBSUB_VERSION: v1.6.58
+  LIBCXML_VERSION: v0.17.7
+  ASDCPLIB_VERSION: carl-2.13.4-dcpomatic
+  ONNXRUNTIME_VERSION: 1.19.2
+
+jobs:
+  # ============================================================================
+  # Linux Build (Ubuntu 22.04)
+  # ============================================================================
+  build-linux:
+    name: Linux (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        path: dcpomatic
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential g++ pkg-config python3 \
+          libboost-all-dev libwxgtk3.0-gtk3-dev \
+          libxml++2.6-dev libxmlsec1-dev libxmlsec1-openssl \
+          libssl-dev libcurl4-openssl-dev libzip-dev \
+          libssh-dev libpangomm-1.4-dev libcairomm-1.0-dev \
+          libsndfile1-dev libsamplerate0-dev libpulse-dev libasound2-dev \
+          libicu-dev nettle-dev libx264-dev libsqlite3-dev \
+          libxerces-c-dev libhpdf-dev libfmt-dev libnanomsg-dev \
+          libjpeg-dev libpng-dev libtiff-dev libopenjp2-7-dev libwebp-dev \
+          libavcodec-dev libavutil-dev libswscale-dev libpostproc-dev libavformat-dev libswresample-dev libavfilter-dev libavdevice-dev \
+          librtaudio-dev \
+          autoconf automake libtool cmake gettext
+
+    # ---- Build OpenJPEG 2.5 (required by libdcp) ----
+    - name: Build OpenJPEG 2.5
+      run: |
+        git clone --branch v2.5.0 https://github.com/uclouvain/openjpeg.git openjpeg
+        cd openjpeg
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release -DBUILD_CODEC=OFF
+        make -j$(nproc)
+        sudo make install
+        sudo ldconfig
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib
+      run: |
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Build locked_sstream (header-only, required by libcxml) ----
+    - name: Build locked_sstream
+      run: |
+        git clone https://github.com/cth103/locked_sstream.git locked_sstream
+        cd locked_sstream
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libcxml ----
+    - name: Build libcxml
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        # Force a tag to ensure version detection works
+        git tag -f v0.17.10
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
+        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Install fast_float (required by libdcp) ----
+    - name: Install fast_float
+      run: |
+        git clone https://github.com/fastfloat/fast_float.git fast_float
+        cd fast_float
+        sudo mkdir -p /usr/local/include/fast_float
+        sudo cp -r include/fast_float/* /usr/local/include/fast_float/
+        ls -la /usr/local/include/fast_float/
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp (with HDR Patch)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        # Force a tag to ensure version detection works
+        git tag -f v1.10.0
+        
+        # Apply HDR Integration Patch
+        echo "Applying HDR patch..."
+        git apply ../dcpomatic/libdcp_hdr_integration.patch
+        
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
+        
+        CXXFLAGS="-I/usr/local/include" ./waf configure --prefix=/usr/local --disable-tests --disable-examples --disable-benchmarks --disable-dumpimage
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Build libsub ----
+    - name: Build libsub
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        git checkout ${{ env.LIBSUB_VERSION }} || true
+        git tag -f v1.6.58
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime
+      run: |
+        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        tar -xzf onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        sudo cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
+        sudo cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
+        sudo ldconfig
+        
+        # Also copy to deps folder for wscript compatibility
+        mkdir -p dcpomatic/deps/onnxruntime
+        cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic
+      run: |
+        cd dcpomatic
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+        CXXFLAGS="-I/usr/local/include" ./waf configure --prefix=/usr/local --disable-tests
+        ./waf build -j$(nproc)
+
+    # ---- Package Artifacts ----
+    - name: Package Linux Build
+      run: |
+        mkdir -p artifacts/linux
+        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_cli artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_batch artifacts/linux/
+        cp dcpomatic/build/src/tools/dcpomatic2_kdm artifacts/linux/
+        # Copy ONNX Runtime library
+        cp /usr/local/lib/libonnxruntime.so* artifacts/linux/
+        # Create tarball
+        cd artifacts
+        tar -czvf dcpomatic-neural-hdr-linux-x64.tar.gz linux/
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-linux-x64
+        path: artifacts/dcpomatic-neural-hdr-linux-x64.tar.gz

@@ -1,0 +1,165 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug build'
+        required: false
+        default: 'false'
+
+env:
+  LIBDCP_VERSION: v1.10.45
+  LIBSUB_VERSION: v1.6.58
+  LIBCXML_VERSION: v0.17.7
+  ASDCPLIB_VERSION: carl-2.13.4-dcpomatic
+  ONNXRUNTIME_VERSION: 1.19.2
+
+jobs:
+  # ============================================================================
+  # Windows Build (MSYS2)
+  # ============================================================================
+  build-windows:
+    name: Windows (64-bit)
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-boost
+          mingw-w64-x86_64-wxwidgets3.2-msw
+          mingw-w64-x86_64-libxml++2.6
+          mingw-w64-x86_64-xmlsec
+          mingw-w64-x86_64-openssl
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-libzip
+          mingw-w64-x86_64-libssh
+          mingw-w64-x86_64-pango
+          mingw-w64-x86_64-cairo
+          mingw-w64-x86_64-libsndfile
+          mingw-w64-x86_64-libsamplerate
+          mingw-w64-x86_64-icu
+          mingw-w64-x86_64-nettle
+          mingw-w64-x86_64-x264
+          mingw-w64-x86_64-sqlite3
+          mingw-w64-x86_64-xerces-c
+          mingw-w64-x86_64-libharu
+          mingw-w64-x86_64-fmt
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ffmpeg
+          mingw-w64-x86_64-rtaudio
+          git patch python3 autoconf automake libtool pkg-config
+
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        path: dcpomatic
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib (Windows)
+      run: |
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Build libcxml ----
+    - name: Build libcxml (Windows)
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp with HDR Patch (Windows)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        git tag -f v1.10.0
+        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
+        ./waf build
+        ./waf install
+
+    # ---- Build libsub ----
+    - name: Build libsub (Windows)
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        git tag -f v1.6.58
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt (Windows)
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64
+        ./waf build
+        ./waf install
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime (Windows)
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}.zip" -OutFile "onnxruntime.zip"
+        Expand-Archive -Path onnxruntime.zip -DestinationPath .
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\include\*" -Destination "C:\msys64\mingw64\include\" -Recurse -Force
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib\*" -Destination "C:\msys64\mingw64\lib\" -Recurse -Force
+        New-Item -ItemType Directory -Force -Path "dcpomatic\deps\onnxruntime"
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\include" -Destination "dcpomatic\deps\onnxruntime\" -Recurse
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib" -Destination "dcpomatic\deps\onnxruntime\" -Recurse
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic (Windows)
+      run: |
+        cd dcpomatic
+        export CXX=/mingw64/bin/g++
+        export CC=/mingw64/bin/gcc
+        ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
+        ./waf build -j$(nproc)
+
+    - name: Package Windows Build
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path artifacts\windows
+        Copy-Item dcpomatic\build\src\tools\*.exe artifacts\windows\
+        Copy-Item "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib\*.dll" artifacts\windows\
+        Compress-Archive -Path artifacts\windows\* -DestinationPath artifacts\dcpomatic-neural-hdr-win-x64.zip
+
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-win-x64
+        path: artifacts/dcpomatic-neural-hdr-win-x64.zip
