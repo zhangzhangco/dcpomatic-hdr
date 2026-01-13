@@ -147,10 +147,10 @@ jobs:
       run: |
         git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
         cd leqm-nrt
-        autoreconf -fiv
-        ./configure --prefix=/usr/local
-        make -j$(nproc)
-        sudo make install
+        cp ../dcpomatic/waf .
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
         sudo ldconfig
 
     # ---- Setup ONNX Runtime ----
