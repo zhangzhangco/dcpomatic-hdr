@@ -79,17 +79,28 @@ jobs:
         sudo ./waf install
         sudo ldconfig
 
+    # ---- Build locked_sstream (header-only, required by libcxml) ----
+    - name: Build locked_sstream
+      run: |
+        git clone https://github.com/cth103/locked_sstream.git locked_sstream
+        cd locked_sstream
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
     # ---- Build libcxml ----
     - name: Build libcxml
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
         ./waf configure --prefix=/usr/local
         ./waf build
         sudo ./waf install
         sudo ldconfig
         # Verify pkg-config file exists
-        ls -la /usr/local/lib/pkgconfig/
+        pkg-config --modversion libcxml || echo "libcxml pkg-config not found!"
 
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp (with HDR Patch)
