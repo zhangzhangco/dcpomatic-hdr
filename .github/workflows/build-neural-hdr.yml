@@ -386,7 +386,7 @@ jobs:
       run: |
         git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
         cd asdcplib
-        ./waf configure --prefix=/mingw64
+        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -395,7 +395,7 @@ jobs:
       run: |
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
-        ./waf configure --prefix=/mingw64
+        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -406,7 +406,7 @@ jobs:
         cd libdcp
         git tag -f v1.10.0
         patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
-        ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
+        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64 --disable-tests --disable-examples
         ./waf build
         ./waf install
 
@@ -416,7 +416,7 @@ jobs:
         git clone https://github.com/cth103/libsub.git libsub
         cd libsub
         git tag -f v1.6.58
-        ./waf configure --prefix=/mingw64
+        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -427,7 +427,7 @@ jobs:
         cd leqm-nrt
         git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
         cp ../dcpomatic/waf .
-        ./waf configure --prefix=/mingw64
+        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64
         ./waf build
         ./waf install
 
@@ -447,7 +447,7 @@ jobs:
     - name: Configure and Build DCP-o-matic (Windows)
       run: |
         cd dcpomatic
-        ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
+        CXX=g++ CC=gcc ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
         ./waf build -j$(nproc)
 
     - name: Package Windows Build
