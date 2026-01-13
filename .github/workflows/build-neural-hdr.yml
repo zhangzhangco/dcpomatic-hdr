@@ -142,6 +142,16 @@ jobs:
         sudo ./waf install
         sudo ldconfig
 
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+        sudo ldconfig
+
     # ---- Setup ONNX Runtime ----
     - name: Setup ONNX Runtime
       run: |
@@ -160,9 +170,9 @@ jobs:
     - name: Configure and Build DCP-o-matic
       run: |
         cd dcpomatic
-        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
         export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-        ./waf configure --prefix=/usr/local --disable-tests
+        CXXFLAGS="-I/usr/local/include" ./waf configure --prefix=/usr/local --disable-tests
         ./waf build -j$(nproc)
 
     # ---- Package Artifacts ----
@@ -379,7 +389,7 @@ jobs:
     - name: Configure and Build DCP-o-matic (Windows)
       run: |
         cd dcpomatic
-        ./waf configure --prefix=/mingw64 --disable-tests
+        ./waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
         ./waf build -j$(nproc)
 
     - name: Package Windows Build
