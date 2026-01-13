@@ -126,7 +126,7 @@ jobs:
         
         export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
         
-        CXXFLAGS="-I/usr/local/include" ./waf configure --prefix=/usr/local --disable-tests --disable-examples
+        CXXFLAGS="-I/usr/local/include" ./waf configure --prefix=/usr/local --disable-tests --disable-examples --disable-benchmarks --disable-dumpimage
         ./waf build
         sudo ./waf install
         sudo ldconfig
