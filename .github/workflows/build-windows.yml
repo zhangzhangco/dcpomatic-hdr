@@ -96,11 +96,29 @@ jobs:
         python3 waf install
         
         echo "=== DIAGNOSTICS ASDCPLIB ==="
-        find /mingw64 -name "libasdcp*"
-        ls -la /mingw64/lib/pkgconfig/ || echo "No pkgconfig dir"
+        find /mingw64 -name "libasdcp*" 2>/dev/null || echo "No libasdcp files found"
+        ls -la /mingw64/lib/pkgconfig/ 2>/dev/null || echo "No pkgconfig dir"
+        
+        # Fallback: Create pkg-config file if it doesn't exist
+        if [ ! -f /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc ]; then
+          echo "Creating libasdcp-dcpomatic.pc manually..."
+          mkdir -p /mingw64/lib/pkgconfig
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "includedir=\${prefix}/include/libasdcp-dcpomatic" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Name: libasdcp-dcpomatic" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Description: AS-DCP File Access Library" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Version: 2.13.0" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Libs: -L\${libdir} -lasdcp-dcpomatic -lkumu-dcpomatic" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Created libasdcp-dcpomatic.pc"
+        fi
+        
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
-        pkg-config --list-all | grep asdcp || echo "asdcp not in pkg-config output"
-        cat /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc || echo "pc file not readable"
+        pkg-config --list-all | grep asdcp || echo "asdcp not in pkg-config"
+        cat /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
 
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
