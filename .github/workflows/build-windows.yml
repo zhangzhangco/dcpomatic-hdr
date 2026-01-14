@@ -274,9 +274,9 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        export LIBRARY_PATH=/mingw64/lib:$LIBRARY_PATH
-        # Force link boost_regex-mt during build (since we skip check)
-        export LINKFLAGS="-L/mingw64/lib -lboost_regex-mt"
+        export LIBPATH=/mingw64/lib
+        # Force link boost_regex-mt during build (bypass linker search issues by using absolute path)
+        export LINKFLAGS="-L/mingw64/lib /mingw64/lib/libboost_regex-mt.a"
         
         # BRUTE FORCE: Hack wscript to skip boost_regex check (replace with locale which works)
         # We supply -lboost_regex-mt manually in LINKFLAGS for the actual build
