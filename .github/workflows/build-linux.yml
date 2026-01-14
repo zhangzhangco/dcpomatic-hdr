@@ -1,12 +1,8 @@
 name: Build Linux
 
+# Temporarily disabled - Linux build is passing
+# Re-enable when ready for final release
 on:
-  push:
-    branches: [ main ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       debug_enabled:

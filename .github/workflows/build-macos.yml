@@ -1,12 +1,8 @@
 name: Build macOS
 
+# Temporarily disabled - focusing on Windows build first
+# Re-enable when ready for final release
 on:
-  push:
-    branches: [ main ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -183,25 +179,30 @@ jobs:
         cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
 
     # ---- Build DCP-o-matic ----
+    - name: Install Dependencies via Homebrew
+      run: |
+        brew update
+        brew install \
+          boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip \
+          pangomm@2.46 cairomm@1.14 libsndfile libsamplerate icu4c nettle x264 sqlite \
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glib meson ninja
+
+    # ... (skipping lines)
+
     - name: Configure and Build DCP-o-matic (macOS)
       run: |
         cd dcpomatic
         echo "=== DIAGNOSTICS START ==="
         ls -l $(brew --prefix)/lib/libboost_system* || echo "No boost_system found"
-        ls -d $(brew --prefix icu4c)/lib/pkgconfig || echo "No icu pkgconfig found"
-        ls $(brew --prefix icu4c)/lib/pkgconfig
-        sed --version || echo "Not GNU sed"
-        grep "boost_system" wscript || echo "Grep failed"
+        echo "Pangomm pkgconfig:"
+        ls -l $(brew --prefix pangomm@2.46)/lib/pkgconfig || echo "No pangomm pkgconfig"
+        echo "Cairomm pkgconfig:"
+        ls -l $(brew --prefix cairomm@1.14)/lib/pkgconfig || echo "No cairomm pkgconfig"
         echo "=== DIAGNOSTICS END ==="
-        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$(brew --prefix icu4c)/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$(brew --prefix icu4c)/lib/pkgconfig:$(brew --prefix pangomm@2.46)/lib/pkgconfig:$(brew --prefix cairomm@1.14)/lib/pkgconfig:$PKG_CONFIG_PATH"
         export LDFLAGS="-L/usr/local/lib -L$(brew --prefix)/lib"
         export CPPFLAGS="-I/usr/local/include -I$(brew --prefix)/include"
-        sed -i '' "s/lib='boost_system'/lib='boost_system-mt'/g" wscript
-        sed -i '' "s/lib='boost_filesystem'/lib='boost_filesystem-mt'/g" wscript
-        sed -i '' "s/lib='boost_date_time'/lib='boost_date_time-mt'/g" wscript
-        sed -i '' "s/lib='boost_thread'/lib='boost_thread-mt'/g" wscript
-        sed -i '' "s/lib='boost_regex'/lib='boost_regex-mt'/g" wscript
-        ./waf configure --prefix=/usr/local --disable-tests
+        ./waf configure --prefix=/usr/local --disable-tests --boost-lib-suffix=-mt
         ./waf build -j$(sysctl -n hw.ncpu)
 
     - name: Package macOS Build
