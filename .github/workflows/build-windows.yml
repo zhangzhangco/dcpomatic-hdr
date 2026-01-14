@@ -155,6 +155,22 @@ jobs:
         python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
         python3 waf build
         python3 waf install
+        
+        # Fallback: Create pkg-config file if it doesn't exist
+        if [ ! -f /mingw64/lib/pkgconfig/libcxml.pc ]; then
+          echo "Creating libcxml.pc manually..."
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libcxml.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "includedir=\${prefix}/include/libcxml" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Name: libcxml" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Description: Simple C++ wrapper for libxml++" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Version: 0.17.10" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Libs: -L\${libdir} -lcxml" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Created libcxml.pc"
+        fi
 
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp with HDR Patch (Windows)
