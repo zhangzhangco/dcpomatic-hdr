@@ -171,13 +171,22 @@ jobs:
     - name: Package Linux Build
       run: |
         mkdir -p artifacts/linux/lib
+        mkdir -p artifacts/linux/share
         
-        # Copy executables
-        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/linux/
-        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/linux/
-        cp dcpomatic/build/src/tools/dcpomatic2_cli artifacts/linux/
-        cp dcpomatic/build/src/tools/dcpomatic2_batch artifacts/linux/
-        cp dcpomatic/build/src/tools/dcpomatic2_kdm artifacts/linux/
+        # Copy locale (translations) and resources
+        cp -r /usr/local/share/locale artifacts/linux/share/
+        cp -r /usr/local/share/dcpomatic2 artifacts/linux/share/
+        
+        # Copy executables to bin/ for standard layout
+        mkdir -p artifacts/linux/bin
+        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/linux/bin/
+        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/linux/bin/
+        cp dcpomatic/build/src/tools/dcpomatic2_cli artifacts/linux/bin/
+        cp dcpomatic/build/src/tools/dcpomatic2_batch artifacts/linux/bin/
+        cp dcpomatic/build/src/tools/dcpomatic2_kdm artifacts/linux/bin/
+        cp dcpomatic/build/src/tools/dcpomatic2_server artifacts/linux/bin/ || true
+        cp dcpomatic/build/src/tools/dcpomatic2_combiner artifacts/linux/bin/ || true
+        cp dcpomatic/build/src/tools/dcpomatic2_verify artifacts/linux/bin/ || true
         
         # Copy dcpomatic shared libraries
         cp dcpomatic/build/src/lib/libdcpomatic2.so* artifacts/linux/lib/
@@ -195,7 +204,10 @@ jobs:
         echo '#!/bin/bash' > artifacts/linux/run.sh
         echo 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> artifacts/linux/run.sh
         echo 'export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"' >> artifacts/linux/run.sh
-        echo 'exec "$SCRIPT_DIR/$1" "${@:2}"' >> artifacts/linux/run.sh
+        echo '# Usage: ./run.sh [app_name] [args...]' >> artifacts/linux/run.sh
+        echo '# Example: ./run.sh dcpomatic2' >> artifacts/linux/run.sh
+        echo 'APP=${1:-dcpomatic2}' >> artifacts/linux/run.sh
+        echo 'exec "$SCRIPT_DIR/bin/$APP" "${@:2}"' >> artifacts/linux/run.sh
         chmod +x artifacts/linux/run.sh
         
         # Create tarball
