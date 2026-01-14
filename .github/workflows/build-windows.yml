@@ -296,11 +296,16 @@ jobs:
         
         python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
         
-        # For build, we need the real regex lib
-        REGEX_LIB=$(cygpath -m /mingw64/lib/libboost_regex-mt.a)
-        echo "Using Boost Regex: $REGEX_LIB"
+        # Workaround for ld not finding MinGW libs by absolute path
+        # Copy boost_regex to a local dir and link using -L
+        mkdir -p local_lib
+        cp /mingw64/lib/libboost_regex-mt.a local_lib/
         
-        export LINKFLAGS="-L/mingw64/lib $REGEX_LIB"
+        # Use full path to local lib, using cygpath to be safe, or just relative
+        # Since waf runs in root, relative path 'local_lib' should work
+        export LINKFLAGS="-L$(pwd)/local_lib -lboost_regex-mt"
+        echo "LINKFLAGS: $LINKFLAGS"
+        
         python3 waf build
         python3 waf install
         
