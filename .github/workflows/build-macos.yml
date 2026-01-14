@@ -183,25 +183,37 @@ jobs:
       run: |
         cd dcpomatic
         PREFIX=$(brew --prefix)
-        BOOST_PREFIX=$(brew --prefix boost)
-        PANGOMM_PREFIX=$(brew --prefix pangomm@2.46)
-        CAIROMM_PREFIX=$(brew --prefix cairomm@1.14)
         ICU_PREFIX=$(brew --prefix icu4c)
         
-        echo "=== DIAGNOSTICS ==="
-        echo "Boost: $BOOST_PREFIX"
-        ls -l $BOOST_PREFIX/lib/libboost_system* || echo "No boost_system"
-        echo "Pangomm: $PANGOMM_PREFIX"
-        ls -l $PANGOMM_PREFIX/lib/pkgconfig/ || echo "No pangomm pkgconfig"
-        echo "Cairomm: $CAIROMM_PREFIX"
-        ls -l $CAIROMM_PREFIX/lib/pkgconfig/ || echo "No cairomm pkgconfig"
+        # Find pangomm and cairomm pkgconfig (may be in libexec)
+        PANGOMM_PC=""
+        for p in "$(brew --prefix pangomm@2.46)/lib/pkgconfig" "$(brew --prefix pangomm@2.46)/libexec/lib/pkgconfig" "$PREFIX/lib/pkgconfig"; do
+          if [ -d "$p" ] && ls "$p"/*.pc 2>/dev/null | grep -q pangomm; then
+            PANGOMM_PC="$p"
+            break
+          fi
+        done
         
-        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$BOOST_PREFIX/lib/pkgconfig:$ICU_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/lib/pkgconfig:$CAIROMM_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
-        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
+        CAIROMM_PC=""
+        for p in "$(brew --prefix cairomm@1.14)/lib/pkgconfig" "$(brew --prefix cairomm@1.14)/libexec/lib/pkgconfig" "$PREFIX/lib/pkgconfig"; do
+          if [ -d "$p" ] && ls "$p"/*.pc 2>/dev/null | grep -q cairomm; then
+            CAIROMM_PC="$p"
+            break
+          fi
+        done
+        
+        echo "=== DIAGNOSTICS ==="
+        echo "PREFIX: $PREFIX"
+        ls -l $PREFIX/lib/libboost_system* 2>/dev/null || echo "No boost_system in PREFIX/lib"
+        echo "PANGOMM_PC: $PANGOMM_PC"
+        echo "CAIROMM_PC: $CAIROMM_PC"
+        
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$ICU_PREFIX/lib/pkgconfig:$PANGOMM_PC:$CAIROMM_PC:$PKG_CONFIG_PATH"
+        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
         export CXXFLAGS="-Wno-deprecated-declarations"
         
-        ./waf configure --prefix=/usr/local --disable-tests --boost-lib-suffix=-mt
+        ./waf configure --prefix=/usr/local --disable-tests
         ./waf build -j$(sysctl -n hw.ncpu)
 
     - name: Package macOS Build
