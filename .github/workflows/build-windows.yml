@@ -98,6 +98,22 @@ jobs:
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
       run: |
+        # Create symlinks for Boost libraries (MinGW uses -mt suffix)
+        echo "Creating Boost symlinks..."
+        cd /mingw64/lib
+        for lib in system filesystem regex thread date_time; do
+          if [ -f "libboost_${lib}-mt.a" ]; then
+            ln -sf "libboost_${lib}-mt.a" "libboost_${lib}.a" || true
+            echo "Linked libboost_${lib}.a -> libboost_${lib}-mt.a"
+          fi
+          if [ -f "libboost_${lib}-mt.dll.a" ]; then
+            ln -sf "libboost_${lib}-mt.dll.a" "libboost_${lib}.dll.a" || true
+            echo "Linked libboost_${lib}.dll.a -> libboost_${lib}-mt.dll.a"
+          fi
+        done
+        ls -la libboost_system* || echo "No boost_system libs"
+        cd -
+        
         git clone https://github.com/cth103/libcxml.git libcxml
         cd libcxml
         
@@ -106,13 +122,6 @@ jobs:
         sed -i 's/load("msvc")/load("g++")/g' wscript
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
-        
-        # MinGW Boost libraries have -mt suffix
-        sed -i "s/'boost_system'/'boost_system-mt'/g" wscript
-        sed -i "s/'boost_filesystem'/'boost_filesystem-mt'/g" wscript
-        sed -i "s/'boost_date_time'/'boost_date_time-mt'/g" wscript
-        sed -i "s/'boost_thread'/'boost_thread-mt'/g" wscript
-        sed -i "s/'boost_regex'/'boost_regex-mt'/g" wscript
         
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
         python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
