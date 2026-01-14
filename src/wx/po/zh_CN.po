@@ -5288,3 +5288,9 @@ msgstr "选择 ONNX 模型"
 msgid "Enable Hue Lock Strategy"
 msgstr "启用色相锁定策略"
 
+
+msgid "Enable Neural HDR Processing"
+msgstr "开启神经网络 HDR 处理"
+
+msgid "Neural HDR"
+msgstr "神经网络 HDR"
