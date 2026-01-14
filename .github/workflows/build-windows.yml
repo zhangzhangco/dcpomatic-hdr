@@ -98,20 +98,23 @@ jobs:
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
       run: |
-        # Create symlinks for Boost libraries (MinGW uses -mt suffix)
+        # Create symlinks for ALL Boost libraries (MinGW uses -mt suffix)
         echo "Creating Boost symlinks..."
         cd /mingw64/lib
-        for lib in system filesystem regex thread date_time; do
-          if [ -f "libboost_${lib}-mt.a" ]; then
-            ln -sf "libboost_${lib}-mt.a" "libboost_${lib}.a" || true
-            echo "Linked libboost_${lib}.a -> libboost_${lib}-mt.a"
-          fi
-          if [ -f "libboost_${lib}-mt.dll.a" ]; then
-            ln -sf "libboost_${lib}-mt.dll.a" "libboost_${lib}.dll.a" || true
-            echo "Linked libboost_${lib}.dll.a -> libboost_${lib}-mt.dll.a"
+        for f in libboost_*-mt.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.a/.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
           fi
         done
-        ls -la libboost_system* || echo "No boost_system libs"
+        for f in libboost_*-mt.dll.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.dll.a/.dll.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        echo "Boost symlinks created:"
+        ls -la libboost_system* libboost_filesystem* libboost_unit_test* 2>/dev/null || echo "Some libs missing"
         cd -
         
         git clone https://github.com/cth103/libcxml.git libcxml
