@@ -217,6 +217,10 @@ jobs:
     # ---- Build DCP-o-matic ----
     - name: Configure and Build DCP-o-matic (macOS)
       run: |
+        # Patch libxml++ headers for C++17 compatibility (replace removed auto_ptr with unique_ptr)
+        echo "Patching libxml++ headers..."
+        find /usr/local/include/libxml++-2.6 -name "*.h" -print0 | xargs -0 sed -i '' 's/std::auto_ptr/std::unique_ptr/g'
+        
         cd dcpomatic
         PREFIX=$(brew --prefix)
         BOOST_PREFIX=$(brew --prefix boost)

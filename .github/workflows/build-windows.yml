@@ -274,6 +274,7 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
+        export LIBRARY_PATH=/mingw64/lib:$LIBRARY_PATH
         
         # DEBUG: Check boost libraries manually
         echo "=== DEBUG LIBBOOST ==="
