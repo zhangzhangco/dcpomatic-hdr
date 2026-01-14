@@ -94,6 +94,13 @@ jobs:
         python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
         python3 waf build
         python3 waf install
+        
+        echo "=== DIAGNOSTICS ASDCPLIB ==="
+        find /mingw64 -name "libasdcp*"
+        ls -la /mingw64/lib/pkgconfig/ || echo "No pkgconfig dir"
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        pkg-config --list-all | grep asdcp || echo "asdcp not in pkg-config output"
+        cat /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc || echo "pc file not readable"
 
     # ---- Build libcxml ----
     - name: Build libcxml (Windows)
