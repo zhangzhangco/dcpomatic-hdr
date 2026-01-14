@@ -86,7 +86,20 @@ jobs:
             newname="${f/-mt.dll.a/.dll.a}"
             ln -sf "$f" "$newname" 2>/dev/null || true
           fi
+          fi
         done
+        
+        # Boost System is header-only in recent versions, but waf checks for the library.
+        # Create a dummy library to satisfy the check.
+        if [ ! -f "libboost_system-mt.a" ]; then
+            echo "Creating dummy libboost_system-mt.a for header-only boost::system"
+            echo "" > dummy.c
+            gcc -c dummy.c -o dummy.o
+            ar rc libboost_system-mt.a dummy.o
+            ranlib libboost_system-mt.a
+            cp libboost_system-mt.a libboost_system.a
+        fi
+        
         echo "Boost symlinks created:"
         ls -la libboost_system* libboost_filesystem* libboost_regex* 2>/dev/null | head -20 || echo "Some libs not found"
 
