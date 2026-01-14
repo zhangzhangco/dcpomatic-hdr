@@ -209,7 +209,7 @@ jobs:
         sed -i '1i #ifndef EDQUOT\n#define EDQUOT 122\n#endif' src/util.cc
         
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
-        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples || (cat build/config.log && exit 1)
+        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples --disable-benchmarks --disable-dumpimage || (cat build/config.log && exit 1)
         python3 waf build
         python3 waf install
         
