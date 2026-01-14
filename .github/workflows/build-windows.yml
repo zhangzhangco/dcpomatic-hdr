@@ -172,6 +172,14 @@ jobs:
           echo "Created libcxml.pc"
         fi
 
+    # ---- Install fast_float ----
+    - name: Install fast_float (Windows)
+      run: |
+        git clone https://github.com/fastfloat/fast_float.git fast_float
+        cd fast_float
+        mkdir -p /mingw64/include/fast_float
+        cp -r include/fast_float/* /mingw64/include/fast_float/
+
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp with HDR Patch (Windows)
       run: |
@@ -189,15 +197,29 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
-        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
-        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
-        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
-        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        # Note: We rely on MinGW symlinks for Boost libraries, so no need to force -mt suffix here
+        
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
-        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples
+        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples || (cat build/config.log && exit 1)
         python3 waf build
         python3 waf install
+        
+        # Fallback: Create pkg-config file for libdcp if needed
+        if [ ! -f /mingw64/lib/pkgconfig/libdcp-1.0.pc ]; then
+          echo "Creating libdcp-1.0.pc manually..."
+          mkdir -p /mingw64/lib/pkgconfig
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "includedir=\${prefix}/include/libdcp-1.0" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Name: libdcp" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Description: DCP-o-matic libdcp" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Version: 1.10.0" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Libs: -L\${libdir} -ldcp-1.0" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Created libdcp-1.0.pc"
+        fi
 
     # ---- Build libsub ----
     - name: Build libsub (Windows)
@@ -212,15 +234,29 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
-        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
-        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
-        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
-        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        # We use boost symlinks
+        
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
         python3 waf configure --prefix=/mingw64
         python3 waf build
         python3 waf install
+        
+        # Fallback for libsub pc
+        if [ ! -f /mingw64/lib/pkgconfig/libsub-1.0.pc ]; then
+          echo "Creating libsub-1.0.pc manually..."
+          mkdir -p /mingw64/lib/pkgconfig
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "includedir=\${prefix}/include/libsub-1.0" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Name: libsub" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Description: DCP-o-matic libsub" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Version: 1.6.58" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Libs: -L\${libdir} -lsub-1.0" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Created libsub-1.0.pc"
+        fi
 
     # ---- Build leqm-nrt ----
     - name: Build leqm-nrt (Windows)
