@@ -134,6 +134,9 @@ jobs:
     # ---- Build libdcp with HDR Patch ----
     - name: Build libdcp with HDR Patch (Windows)
       run: |
+        # Create empty libdl.a (dl doesn't exist on Windows but libdcp checks for it)
+        ar rcs /mingw64/lib/libdl.a
+        
         git clone https://github.com/cth103/libdcp.git libdcp
         cd libdcp
         git tag -f v1.10.0
