@@ -187,37 +187,36 @@ jobs:
       run: |
         cd dcpomatic
         PREFIX=$(brew --prefix)
+        BOOST_PREFIX=$(brew --prefix boost)
         ICU_PREFIX=$(brew --prefix icu4c)
         
-        # Find pangomm and cairomm pkgconfig (may be in libexec)
-        PANGOMM_PC=""
-        for p in "$(brew --prefix pangomm@2.46)/lib/pkgconfig" "$(brew --prefix pangomm@2.46)/libexec/lib/pkgconfig" "$PREFIX/lib/pkgconfig"; do
-          if [ -d "$p" ] && ls "$p"/*.pc 2>/dev/null | grep -q pangomm; then
-            PANGOMM_PC="$p"
-            break
-          fi
-        done
+        echo "=== BOOST DIAGNOSTICS ==="
+        echo "BOOST_PREFIX: $BOOST_PREFIX"
+        ls -la $BOOST_PREFIX/lib/libboost_system* 2>/dev/null || echo "No boost_system libs in BOOST_PREFIX"
+        ls -la $PREFIX/lib/libboost_system* 2>/dev/null || echo "No boost_system libs in PREFIX"
         
-        CAIROMM_PC=""
-        for p in "$(brew --prefix cairomm@1.14)/lib/pkgconfig" "$(brew --prefix cairomm@1.14)/libexec/lib/pkgconfig" "$PREFIX/lib/pkgconfig"; do
-          if [ -d "$p" ] && ls "$p"/*.pc 2>/dev/null | grep -q cairomm; then
-            CAIROMM_PC="$p"
-            break
-          fi
-        done
+        # Find pangomm pkgconfig (could be pangomm-1.4, pangomm-2.44, pangomm-2.48)
+        echo "=== PANGOMM DIAGNOSTICS ==="
+        PANGOMM_PREFIX=$(brew --prefix pangomm@2.46)
+        echo "PANGOMM_PREFIX: $PANGOMM_PREFIX"
+        ls -la $PANGOMM_PREFIX/lib/pkgconfig/*.pc 2>/dev/null || echo "No pc files in lib/pkgconfig"
+        ls -la $PANGOMM_PREFIX/libexec/lib/pkgconfig/*.pc 2>/dev/null || echo "No pc files in libexec/lib/pkgconfig"
         
-        echo "=== DIAGNOSTICS ==="
-        echo "PREFIX: $PREFIX"
-        ls -l $PREFIX/lib/libboost_system* 2>/dev/null || echo "No boost_system in PREFIX/lib"
-        echo "PANGOMM_PC: $PANGOMM_PC"
-        echo "CAIROMM_PC: $CAIROMM_PC"
+        # Also check default pkgconfig
+        echo "Looking for pangomm in default pkgconfig..."
+        pkg-config --list-all | grep -i pango || echo "No pangomm in pkg-config"
         
-        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$ICU_PREFIX/lib/pkgconfig:$PANGOMM_PC:$CAIROMM_PC:$PKG_CONFIG_PATH"
-        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib"
-        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
+        CAIROMM_PREFIX=$(brew --prefix cairomm@1.14)
+        
+        # Build PKG_CONFIG_PATH with all possible locations
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$BOOST_PREFIX/lib/pkgconfig:$ICU_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/libexec/lib/pkgconfig:$CAIROMM_PREFIX/lib/pkgconfig:$CAIROMM_PREFIX/libexec/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
         export CXXFLAGS="-Wno-deprecated-declarations"
         
-        ./waf configure --prefix=/usr/local --disable-tests
+        echo "PKG_CONFIG_PATH: $PKG_CONFIG_PATH"
+        
+        ./waf configure --prefix=/usr/local --disable-tests --static-boost || (cat build/config.log && exit 1)
         ./waf build -j$(sysctl -n hw.ncpu)
 
     - name: Package macOS Build

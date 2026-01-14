@@ -70,7 +70,26 @@ jobs:
       with:
         path: dcpomatic
 
-    # ---- Build asdcplib ----
+    # ---- Create Boost symlinks (MinGW uses -mt suffix) ----
+    - name: Create Boost Library Symlinks (Windows)
+      run: |
+        echo "Creating Boost symlinks..."
+        cd /mingw64/lib
+        for f in libboost_*-mt.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.a/.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        for f in libboost_*-mt.dll.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.dll.a/.dll.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        echo "Boost symlinks created:"
+        ls -la libboost_system* libboost_filesystem* libboost_regex* 2>/dev/null | head -20
+
     # ---- Build asdcplib ----
     - name: Build asdcplib (Windows)
       run: |
