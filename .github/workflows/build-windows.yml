@@ -275,6 +275,21 @@ jobs:
         export CC=gcc.exe
         export AR=ar.exe
         export LIBRARY_PATH=/mingw64/lib:$LIBRARY_PATH
+        export LINKFLAGS="-L/mingw64/lib"
+        
+        # BRUTE FORCE: Copy libraries instead of symlinks. LD on Windows can be picky.
+        echo "Forcing copy of boost regex lib..."
+        cp /mingw64/lib/libboost_regex-mt.a /mingw64/lib/libboost_regex.a || true
+        cp /mingw64/lib/libboost_regex-mt.dll.a /mingw64/lib/libboost_regex.dll.a || true
+        
+        # Re-verify/create dummy boost_system
+        if [ ! -f /mingw64/lib/libboost_system.a ]; then
+            echo "Creating dummy libboost_system.a again..."
+            echo "" > dummy.c
+            gcc -c dummy.c -o dummy.o
+            ar rc /mingw64/lib/libboost_system.a dummy.o
+            ranlib /mingw64/lib/libboost_system.a
+        fi
         
         # DEBUG: Check boost libraries manually
         echo "=== DEBUG LIBBOOST ==="

@@ -219,7 +219,7 @@ jobs:
       run: |
         # Patch libxml++ headers for C++17 compatibility (replace removed auto_ptr with unique_ptr)
         echo "Patching libxml++ headers..."
-        find /usr/local/include/libxml++-2.6 -name "*.h" -print0 | xargs -0 sed -i '' 's/std::auto_ptr/std::unique_ptr/g'
+        find /usr/local/include/libxml++-2.6 -name "*.h" -print0 | xargs -0 sudo sed -i '' 's/std::auto_ptr/std::unique_ptr/g'
         
         cd dcpomatic
         PREFIX=$(brew --prefix)
