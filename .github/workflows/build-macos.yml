@@ -248,7 +248,8 @@ jobs:
         export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$BOOST_PREFIX/lib/pkgconfig:$ICU_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/libexec/lib/pkgconfig:$CAIROMM_PREFIX/lib/pkgconfig:$CAIROMM_PREFIX/libexec/lib/pkgconfig:$PKG_CONFIG_PATH"
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
-        export CXXFLAGS="-Wno-deprecated-declarations"
+        # Suppress warnings that are treated as errors
+        export CXXFLAGS="-Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable"
         
         echo "PKG_CONFIG_PATH: $PKG_CONFIG_PATH"
         
