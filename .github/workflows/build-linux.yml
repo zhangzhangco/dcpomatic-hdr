@@ -170,14 +170,34 @@ jobs:
     # ---- Package Artifacts ----
     - name: Package Linux Build
       run: |
-        mkdir -p artifacts/linux
+        mkdir -p artifacts/linux/lib
+        
+        # Copy executables
         cp dcpomatic/build/src/tools/dcpomatic2 artifacts/linux/
         cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/linux/
         cp dcpomatic/build/src/tools/dcpomatic2_cli artifacts/linux/
         cp dcpomatic/build/src/tools/dcpomatic2_batch artifacts/linux/
         cp dcpomatic/build/src/tools/dcpomatic2_kdm artifacts/linux/
-        # Copy ONNX Runtime library
-        cp /usr/local/lib/libonnxruntime.so* artifacts/linux/
+        
+        # Copy dcpomatic shared libraries
+        cp dcpomatic/build/src/lib/libdcpomatic2.so* artifacts/linux/lib/
+        cp dcpomatic/build/src/wx/libdcpomatic2-wx.so* artifacts/linux/lib/
+        
+        # Copy dependency libraries
+        cp /usr/local/lib/libdcp-1.0.so* artifacts/linux/lib/ || true
+        cp /usr/local/lib/libsub-1.0.so* artifacts/linux/lib/ || true
+        cp /usr/local/lib/libcxml.so* artifacts/linux/lib/ || true
+        cp /usr/local/lib/libasdcp-dcpomatic.so* artifacts/linux/lib/ || true
+        cp /usr/local/lib/libkumu-dcpomatic.so* artifacts/linux/lib/ || true
+        cp /usr/local/lib/libonnxruntime.so* artifacts/linux/lib/
+        
+        # Create run script
+        echo '#!/bin/bash' > artifacts/linux/run.sh
+        echo 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> artifacts/linux/run.sh
+        echo 'export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"' >> artifacts/linux/run.sh
+        echo 'exec "$SCRIPT_DIR/$1" "${@:2}"' >> artifacts/linux/run.sh
+        chmod +x artifacts/linux/run.sh
+        
         # Create tarball
         cd artifacts
         tar -czvf dcpomatic-neural-hdr-linux-x64.tar.gz linux/
