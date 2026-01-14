@@ -275,11 +275,10 @@ jobs:
         export CC=gcc.exe
         export AR=ar.exe
         export LIBPATH=/mingw64/lib
-        # Force link boost_regex-mt during build (bypass linker search issues by using absolute path)
-        export LINKFLAGS="-L/mingw64/lib /mingw64/lib/libboost_regex-mt.a"
+        # Reset LINKFLAGS for configure (don't force regex yet)
+        export LINKFLAGS="-L/mingw64/lib"
         
         # BRUTE FORCE: Hack wscript to skip boost_regex check (replace with locale which works)
-        # We supply -lboost_regex-mt manually in LINKFLAGS for the actual build
         echo "Hacking wscript to bypass boost_regex check..."
         sed -i "s/lib=boost_lib_suffix('regex')/lib=boost_lib_suffix('locale')/g" wscript
 
@@ -292,33 +291,16 @@ jobs:
             ranlib /mingw64/lib/libboost_system.a
         fi
         
-        # DEBUG: Check boost libraries manually
-        echo "=== DEBUG LIBBOOST ==="
-        ls -la /mingw64/lib/libboost_system*
-        echo "Testing manual link:"
-        echo "#include <boost/system/error_code.hpp>" > test_boost.cpp
-        echo "int main() { boost::system::error_code ec; return 0; }" >> test_boost.cpp
-        # Try linking with -mt
-        if g++ test_boost.cpp -o test_boost -lboost_system-mt; then
-            echo "Manual link with -lboost_system-mt SUCCESS"
-        else
-            echo "Manual link with -lboost_system-mt FAILED"
-        fi
-        
-        # Force Boost -mt suffix for libsub (waf detection via symlink failed for some libs)
-        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
-        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
-        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
-        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
-        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
-        
-        echo "=== Wscript after sed ==="
-        cat wscript | grep "lib='boost"
-        
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
-        # Add -ws2_32 just in case boost_system needs it (though it shouldn't be required for checking existence)
         export CXXFLAGS="-DBOOST_SYSTEM_NO_DEPRECATED"
+        
         python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
+        
+        # For build, we need the real regex lib
+        REGEX_LIB=$(cygpath -m /mingw64/lib/libboost_regex-mt.a)
+        echo "Using Boost Regex: $REGEX_LIB"
+        
+        export LINKFLAGS="-L/mingw64/lib $REGEX_LIB"
         python3 waf build
         python3 waf install
         
