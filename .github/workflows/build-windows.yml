@@ -86,7 +86,6 @@ jobs:
             newname="${f/-mt.dll.a/.dll.a}"
             ln -sf "$f" "$newname" 2>/dev/null || true
           fi
-          fi
         done
         
         # Boost System is header-only in recent versions, but waf checks for the library.
