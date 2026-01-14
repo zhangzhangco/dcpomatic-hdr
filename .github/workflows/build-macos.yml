@@ -100,8 +100,8 @@ jobs:
     # ---- Build cairomm 1.0 (Manual build for macOS) ----
     - name: Build cairomm 1.0 (macOS)
       run: |
-        wget https://download.gnome.org/sources/cairomm/1.12/cairomm-1.12.2.tar.xz
-        tar xf cairomm-1.12.2.tar.xz
+        wget https://cairographics.org/releases/cairomm-1.12.2.tar.gz
+        tar xf cairomm-1.12.2.tar.gz
         cd cairomm-1.12.2
         PREFIX=$(brew --prefix)
         export CXXFLAGS="-I$PREFIX/include -std=c++11"
@@ -114,9 +114,9 @@ jobs:
     # ---- Build pangomm 1.4 (Manual build for macOS) ----
     - name: Build pangomm 1.4 (macOS)
       run: |
-        wget https://download.gnome.org/sources/pangomm/2.42/pangomm-2.42.2.tar.xz
-        tar xf pangomm-2.42.2.tar.xz
-        cd pangomm-2.42.2
+        wget https://download.gnome.org/sources/pangomm/2.42/pangomm-2.42.1.tar.xz
+        tar xf pangomm-2.42.1.tar.xz
+        cd pangomm-2.42.1
         PREFIX=$(brew --prefix)
         export CXXFLAGS="-I$PREFIX/include -std=c++11"
         export LDFLAGS="-L$PREFIX/lib"
