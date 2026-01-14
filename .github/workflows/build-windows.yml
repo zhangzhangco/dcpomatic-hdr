@@ -203,7 +203,8 @@ jobs:
         echo "Patching libdcp source..."
         sed -i 's/_file = fopen(path.c_str()/_file = fopen(path.string().c_str()/' src/file.cc
         sed -i 's/parser.parse(xml.c_str())/parser.parse(xml.string().c_str())/' src/verify.cc
-        
+        # Fix WEXITSTATUS missing on Windows
+        sed -i '1i #ifdef _WIN32\n#ifndef WEXITSTATUS\n#define WEXITSTATUS(w) (w)\n#endif\n#endif' src/certificate_chain.cc
         # Workaround for missing EDQUOT in MinGW
         sed -i '1i #ifndef EDQUOT\n#define EDQUOT 122\n#endif' src/util.cc
         
