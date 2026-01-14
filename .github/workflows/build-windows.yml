@@ -243,7 +243,13 @@ jobs:
         export CXX=g++.exe
         export CC=gcc.exe
         export AR=ar.exe
-        # We use boost symlinks
+        
+        # Force Boost -mt suffix for libsub (waf detection via symlink failed for some libs)
+        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
+        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
+        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
+        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
+        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
         
         export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
         python3 waf configure --prefix=/mingw64
