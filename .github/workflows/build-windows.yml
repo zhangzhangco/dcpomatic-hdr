@@ -278,28 +278,24 @@ jobs:
         # (matching -lboost_regex), and add it to search path.
         
         mkdir -p local_lib
-        echo "Looking for boost_regex library in /mingw64/lib..."
-        find /mingw64/lib -maxdepth 1 -name "libboost_regex*.a"
+        echo "Looking for boost_regex library using pacman..."
         
-        # Find the static lib (avoid dll.a if possible, or take first)
-        REGEX_SRC=$(find /mingw64/lib -maxdepth 1 -name "libboost_regex*-mt.a" | grep -v ".dll.a" | head -n 1)
-        if [ -z "$REGEX_SRC" ]; then
-            # Fallback to any regex lib
-            REGEX_SRC=$(find /mingw64/lib -maxdepth 1 -name "libboost_regex*.a" | grep -v ".dll.a" | head -n 1)
+        # Use pacman to find where the file is installed
+        REGEX_PATH=$(pacman -Ql mingw-w64-x86_64-boost | grep "libboost_regex" | grep "-mt.a" | grep -v "dll" | head -n 1 | awk '{print $2}')
+        
+        if [ -z "$REGEX_PATH" ]; then
+             echo "Regex -mt.a not found via pacman, searching for any .a..."
+             REGEX_PATH=$(pacman -Ql mingw-w64-x86_64-boost | grep "libboost_regex" | grep "\.a$" | grep -v "dll" | head -n 1 | awk '{print $2}')
         fi
         
-        if [ -z "$REGEX_SRC" ]; then
-             echo "ERROR: Could not find any libboost_regex*.a in /mingw64/lib"
-             ls -la /mingw64/lib/libboost*
+        if [ -z "$REGEX_PATH" ]; then
+             echo "CRITICAL ERROR: Boost regex library not found in package mingw-w64-x86_64-boost"
              exit 1
         fi
         
-        echo "Found Boost Regex Lib: $REGEX_SRC"
-        cp "$REGEX_SRC" local_lib/libboost_regex.a
+        echo "Found Boost Regex Lib at: $REGEX_PATH"
+        cp "$REGEX_PATH" local_lib/libboost_regex.a
         
-        # Link against this local lib for both configure and build
-        # We need absolute path for local_lib because waf changes directory? No, waf runs from root usually.
-        # But we use $(pwd) to be safe.
         LOCAL_LIB_PATH="$(pwd)/local_lib"
         export LINKFLAGS="-L/mingw64/lib -L$LOCAL_LIB_PATH"
 
