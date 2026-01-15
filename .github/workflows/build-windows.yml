@@ -277,7 +277,9 @@ jobs:
         # So we create a local lib dir, copy the boost library there with the name 'libboost_regex.a' 
         # (matching -lboost_regex), and add it to search path.
         
-        mkdir -p local_lib
+        echo "Reinstalling boost to ensure regex lib exists..."
+        pacman -S --needed --noconfirm mingw-w64-x86_64-boost
+        
         mkdir -p local_lib
         echo "Looking for boost_regex library using Python..."
         
