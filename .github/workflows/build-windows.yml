@@ -281,8 +281,20 @@ jobs:
         pacman -R --noconfirm mingw-w64-x86_64-boost || true
         # Install specific version cache or download
         wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
-        # Force overwrite to deal with boost-libs conflicts
-        pacman -U --noconfirm --overwrite '*' mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
+        
+        # Manual extraction (since pacman installation seems to lose files or conflict)
+        echo "Manually extracting boost package..."
+        zstd -d mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
+        tar xf mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar
+        
+        # Pacman install for dependencies but ignore file conflicts if any (we extracted manually)
+        # pacman -U --noconfirm --overwrite '*' mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst || true
+        # Actually, let's skip pacman install of this package to avoid 'missing files' logic if pacman cleans up.
+        # We rely on our extracted files being present in current dir structure, but we need to move them to /mingw64
+        
+        echo "Moving extracted files to /mingw64..."
+        # The package structure starts with mingw64/
+        cp -r mingw64/* /mingw64/
         
         mkdir -p local_lib
         echo "Looking for boost_regex library using Python..."

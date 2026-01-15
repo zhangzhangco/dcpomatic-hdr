@@ -163,59 +163,26 @@ jobs:
         git apply ../dcpomatic/libdcp_hdr_integration.patch
         PREFIX=$(brew --prefix)
         BOOST_PREFIX=$(brew --prefix boost)
-        # Add all suppressions to libdcp as well. Add brute-force includes for OpenJPEG.
-        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include -I$PREFIX/include/openjpeg-2.5 -I$PREFIX/include/openjpeg-2.4 -I$PREFIX/include/openjpeg-2.3 -Wno-deprecated -Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -std=c++11"
+        
+        # Manual OpenJPEG Build (since brew is failing us)
+        echo "Building OpenJPEG from source..."
+        wget https://github.com/uclouvain/openjpeg/archive/v2.5.0.tar.gz
+        tar xf v2.5.0.tar.gz
+        cd openjpeg-2.5.0
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+        cd ../..
+        
+        # Add all suppressions and includes
+        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include -I$PREFIX/include/openjpeg-2.5 -Wno-deprecated -Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -std=c++11"
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
-        # Explicitly add openjpeg pkgconfig path (it might be keg-only)
-        OPENJPEG_PC=$(find /usr/local /opt/homebrew -name libopenjp2.pc 2>/dev/null | head -n 1)
-        if [ ! -z "$OPENJPEG_PC" ]; then
-             OPENJPEG_PC_DIR=$(dirname "$OPENJPEG_PC")
-             echo "Found libopenjp2.pc at $OPENJPEG_PC_DIR"
-             export PKG_CONFIG_PATH="$OPENJPEG_PC_DIR:$PKG_CONFIG_PATH"
-        else
-             echo "WARNING: libopenjp2.pc not found. Creating a dummy one."
-             
-             # Dynamic lookup for header
-             OPENJPEG_H=$(find /usr/local/include /opt/homebrew/include -name openjpeg.h 2>/dev/null | head -n 1)
-             if [ ! -z "$OPENJPEG_H" ]; then
-                  OPENJPEG_INC_DIR=$(dirname "$OPENJPEG_H")
-                  echo "Found openjpeg.h at $OPENJPEG_INC_DIR"
-             else
-                  # Fallback and Debug
-                  echo "openjpeg.h not found via find. Listing openjpeg dir:"
-                  ls -R $(brew --prefix openjpeg) || true
-                  
-                  # Symlink hack: try to force link include/openjpeg-2.*/* to include/
-                  # careful with permissions, but we are runner user
-                  OPENJPEG_ROOT=$(brew --prefix openjpeg)
-                  mkdir -p $OPENJPEG_ROOT/include
-                  ln -sf $OPENJPEG_ROOT/include/openjpeg-2.*/*.h $OPENJPEG_ROOT/include/ || true
-                  OPENJPEG_INC_DIR=$OPENJPEG_ROOT/include
-                  
-                  # Add this new dir to CXXFLAGS just in case
-                  export CXXFLAGS="$CXXFLAGS -I$OPENJPEG_INC_DIR"
-             fi
-
-             mkdir -p pkgconfig_hack
-             cat > pkgconfig_hack/libopenjp2.pc <<EOF
-        prefix=$(brew --prefix openjpeg)
-        exec_prefix=\${prefix}
-        libdir=\${exec_prefix}/lib
-        includedir=$OPENJPEG_INC_DIR
         
-        Name: openjp2
-        Description: JPEG2000 library (Hack)
-        Version: 2.5.0
-        Libs: -L\${libdir} -lopenjp2
-        Cflags: -I\${includedir}
-        EOF
-             export PKG_CONFIG_PATH="$(pwd)/pkgconfig_hack:$PKG_CONFIG_PATH"
-             echo "Created dummy libopenjp2.pc in $(pwd)/pkgconfig_hack"
-             cat pkgconfig_hack/libopenjp2.pc
-        fi
-        
-        OPENJPEG_PREFIX=$(brew --prefix openjpeg)
+        # Explicitly add openjpeg pkgconfig path (from our manual install)
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         
         ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests --disable-examples
         ./waf build
