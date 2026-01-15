@@ -249,7 +249,8 @@ jobs:
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
         # Force Boost IoContext and Resolver Results (for Boost 1.86+)
-        export CXXFLAGS="-Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -DDCPOMATIC_HAVE_BOOST_ASIO_IO_CONTEXT -DDCPOMATIC_HAVE_BOOST_ASIO_IP_BASIC_RESOLVER_RESULTS"
+        # Add -Wno-mismatched-tags for libxml++ headers
+        export CXXFLAGS="-Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -DDCPOMATIC_HAVE_BOOST_ASIO_IO_CONTEXT -DDCPOMATIC_HAVE_BOOST_ASIO_IP_BASIC_RESOLVER_RESULTS"
         
         echo "PKG_CONFIG_PATH: $PKG_CONFIG_PATH"
         

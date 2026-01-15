@@ -280,7 +280,7 @@ jobs:
         
         # BRUTE FORCE: Hack wscript to skip boost_regex check (replace with locale which works)
         echo "Hacking wscript to bypass boost_regex check..."
-        sed -i "s/lib=boost_lib_suffix('regex')/lib=boost_lib_suffix('locale')/g" wscript
+        sed -i "s/boost_regex/boost_locale/g" wscript
 
         # Re-verify/create dummy boost_system
         if [ ! -f /mingw64/lib/libboost_system.a ]; then
