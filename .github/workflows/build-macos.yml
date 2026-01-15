@@ -182,8 +182,19 @@ jobs:
                   OPENJPEG_INC_DIR=$(dirname "$OPENJPEG_H")
                   echo "Found openjpeg.h at $OPENJPEG_INC_DIR"
              else
-                  # Fallback
-                  OPENJPEG_INC_DIR=$(brew --prefix)/include/openjpeg-2.5
+                  # Fallback and Debug
+                  echo "openjpeg.h not found via find. Listing openjpeg dir:"
+                  ls -R $(brew --prefix openjpeg) || true
+                  
+                  # Symlink hack: try to force link include/openjpeg-2.*/* to include/
+                  # careful with permissions, but we are runner user
+                  OPENJPEG_ROOT=$(brew --prefix openjpeg)
+                  mkdir -p $OPENJPEG_ROOT/include
+                  ln -sf $OPENJPEG_ROOT/include/openjpeg-2.*/*.h $OPENJPEG_ROOT/include/ || true
+                  OPENJPEG_INC_DIR=$OPENJPEG_ROOT/include
+                  
+                  # Add this new dir to CXXFLAGS just in case
+                  export CXXFLAGS="$CXXFLAGS -I$OPENJPEG_INC_DIR"
              fi
 
              mkdir -p pkgconfig_hack

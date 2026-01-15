@@ -281,7 +281,8 @@ jobs:
         pacman -R --noconfirm mingw-w64-x86_64-boost || true
         # Install specific version cache or download
         wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
-        pacman -U --noconfirm mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
+        # Force overwrite to deal with boost-libs conflicts
+        pacman -U --noconfirm --overwrite '*' mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
         
         mkdir -p local_lib
         echo "Looking for boost_regex library using Python..."
