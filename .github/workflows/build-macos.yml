@@ -175,18 +175,29 @@ jobs:
              export PKG_CONFIG_PATH="$OPENJPEG_PC_DIR:$PKG_CONFIG_PATH"
         else
              echo "WARNING: libopenjp2.pc not found. Creating a dummy one."
+             
+             # Dynamic lookup for header
+             OPENJPEG_H=$(find /usr/local/include /opt/homebrew/include -name openjpeg.h 2>/dev/null | head -n 1)
+             if [ ! -z "$OPENJPEG_H" ]; then
+                  OPENJPEG_INC_DIR=$(dirname "$OPENJPEG_H")
+                  echo "Found openjpeg.h at $OPENJPEG_INC_DIR"
+             else
+                  # Fallback
+                  OPENJPEG_INC_DIR=$(brew --prefix)/include/openjpeg-2.5
+             fi
+
              mkdir -p pkgconfig_hack
              cat > pkgconfig_hack/libopenjp2.pc <<EOF
         prefix=$(brew --prefix openjpeg)
         exec_prefix=\${prefix}
         libdir=\${exec_prefix}/lib
-        includedir=\${prefix}/include/openjpeg-2.5
+        includedir=$OPENJPEG_INC_DIR
         
         Name: openjp2
         Description: JPEG2000 library (Hack)
         Version: 2.5.0
         Libs: -L\${libdir} -lopenjp2
-        Cflags: -I\${includedir} -I\${prefix}/include
+        Cflags: -I\${includedir}
         EOF
              export PKG_CONFIG_PATH="$(pwd)/pkgconfig_hack:$PKG_CONFIG_PATH"
              echo "Created dummy libopenjp2.pc in $(pwd)/pkgconfig_hack"

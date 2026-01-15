@@ -298,6 +298,13 @@ jobs:
         fi
         
         if [ -z "$REGEX_PATH" ]; then
+             echo "Static lib not found, looking for dll.a as fallback..."
+             REGEX_PATH=$(python3 -c "import glob; \
+             libs = glob.glob('/mingw64/lib/libboost_regex*.dll.a'); \
+             print(libs[0] if libs else '')")
+        fi
+        
+        if [ -z "$REGEX_PATH" ]; then
              echo "CRITICAL ERROR: Boost regex library not found in /mingw64/lib"
              # List dir for debug
              ls -C /mingw64/lib/libboost* || true
@@ -305,7 +312,13 @@ jobs:
         fi
         
         echo "Found Boost Regex Lib at: $REGEX_PATH"
-        cp "$REGEX_PATH" local_lib/libboost_regex.a
+        # Determine target name based on extension
+        if [[ "$REGEX_PATH" == *".dll.a" ]]; then
+             cp "$REGEX_PATH" local_lib/libboost_regex.dll.a
+             # Also copy as .a just in case ld wants it? No, ld prefers dll.a
+        else
+             cp "$REGEX_PATH" local_lib/libboost_regex.a
+        fi
         
         LOCAL_LIB_PATH="$(pwd)/local_lib"
         export LINKFLAGS="-L/mingw64/lib -L$LOCAL_LIB_PATH"
