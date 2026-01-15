@@ -165,7 +165,12 @@ jobs:
         export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib"
-        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        
+        # Explicitly add openjpeg pkgconfig path (it might be keg-only)
+        OPENJPEG_PREFIX=$(brew --prefix openjpeg)
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$OPENJPEG_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        echo "PKG_CONFIG_PATH for libdcp: $PKG_CONFIG_PATH"
+        
         ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests --disable-examples
         ./waf build
         sudo ./waf install

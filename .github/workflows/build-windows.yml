@@ -272,15 +272,19 @@ jobs:
         sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
         sed -i "s/load('compiler_c')/load('gcc')/g" wscript
         export CXX=g++.exe
-        export CC=gcc.exe
-        export AR=ar.exe
         export LIBPATH=/mingw64/lib
-        # Reset LINKFLAGS for configure (don't force regex yet)
-        export LINKFLAGS="-L/mingw64/lib"
+        # Workaround: waf check fails because ld can't find libraries in absolute paths if passed via -l
+        # So we create a local lib dir, copy the boost library there with the name 'libboost_regex.a' 
+        # (matching -lboost_regex), and add it to search path.
         
-        # BRUTE FORCE: Hack wscript to skip boost_regex check (replace with locale which works)
-        echo "Hacking wscript to bypass boost_regex check..."
-        sed -i "s/boost_regex/boost_locale/g" wscript
+        mkdir -p local_lib
+        cp /mingw64/lib/libboost_regex-mt.a local_lib/libboost_regex.a
+        
+        # Link against this local lib for both configure and build
+        # We need absolute path for local_lib because waf changes directory? No, waf runs from root usually.
+        # But we use $(pwd) to be safe.
+        LOCAL_LIB_PATH="$(pwd)/local_lib"
+        export LINKFLAGS="-L/mingw64/lib -L$LOCAL_LIB_PATH"
 
         # Re-verify/create dummy boost_system
         if [ ! -f /mingw64/lib/libboost_system.a ]; then
@@ -296,16 +300,8 @@ jobs:
         
         python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
         
-        # Workaround for ld not finding MinGW libs by absolute path
-        # Copy boost_regex to a local dir and link using -L
-        mkdir -p local_lib
-        cp /mingw64/lib/libboost_regex-mt.a local_lib/
-        
-        # Use full path to local lib, using cygpath to be safe, or just relative
-        # Since waf runs in root, relative path 'local_lib' should work
-        export LINKFLAGS="-L$(pwd)/local_lib -lboost_regex-mt"
-        echo "LINKFLAGS: $LINKFLAGS"
-        
+        # For build, we still need the regex lib (waf might use -lboost_regex if check passed)
+        # Our LINKFLAGS already has -Llocal_lib, so it should find libboost_regex.a
         python3 waf build
         python3 waf install
         
