@@ -162,8 +162,10 @@ jobs:
         # Apply patch for neural HDR integration
         git apply ../dcpomatic/libdcp_hdr_integration.patch
         PREFIX=$(brew --prefix)
-        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
-        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include"
+        BOOST_PREFIX=$(brew --prefix boost)
+        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
+        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
         # Explicitly add openjpeg pkgconfig path (it might be keg-only)
         OPENJPEG_PC=$(find /usr/local /opt/homebrew -name libopenjp2.pc 2>/dev/null | head -n 1)
         if [ ! -z "$OPENJPEG_PC" ]; then

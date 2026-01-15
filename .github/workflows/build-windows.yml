@@ -278,18 +278,27 @@ jobs:
         # (matching -lboost_regex), and add it to search path.
         
         mkdir -p local_lib
-        echo "Looking for boost_regex library using pacman..."
+        mkdir -p local_lib
+        echo "Looking for boost_regex library using Python..."
         
-        # Use pacman to find where the file is installed
-        REGEX_PATH=$(pacman -Ql mingw-w64-x86_64-boost | grep "libboost_regex" | grep "-mt.a" | grep -v "dll" | head -n 1 | awk '{print $2}')
+        # Use Python to find the file (robust against shell/grep issues)
+        REGEX_PATH=$(python3 -c "import glob; \
+        libs = glob.glob('/mingw64/lib/libboost_regex*-mt.a'); \
+        libs = [l for l in libs if '.dll.a' not in l]; \
+        print(libs[0] if libs else '')")
         
         if [ -z "$REGEX_PATH" ]; then
-             echo "Regex -mt.a not found via pacman, searching for any .a..."
-             REGEX_PATH=$(pacman -Ql mingw-w64-x86_64-boost | grep "libboost_regex" | grep "\.a$" | grep -v "dll" | head -n 1 | awk '{print $2}')
+             echo "Regex -mt.a not found via glob, looking for any .a..."
+             REGEX_PATH=$(python3 -c "import glob; \
+             libs = glob.glob('/mingw64/lib/libboost_regex*.a'); \
+             libs = [l for l in libs if '.dll.a' not in l]; \
+             print(libs[0] if libs else '')")
         fi
         
         if [ -z "$REGEX_PATH" ]; then
-             echo "CRITICAL ERROR: Boost regex library not found in package mingw-w64-x86_64-boost"
+             echo "CRITICAL ERROR: Boost regex library not found in /mingw64/lib"
+             # List dir for debug
+             ls -C /mingw64/lib/libboost* || true
              exit 1
         fi
         
