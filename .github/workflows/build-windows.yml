@@ -297,43 +297,37 @@ jobs:
         cp -r mingw64/* /mingw64/
         
         mkdir -p local_lib
-        echo "Looking for boost_regex library using Python..."
+        echo "Looking for boost_regex library in extracted package..."
         
-        # Use Python to find the file (robust against shell/grep issues)
-        REGEX_PATH=$(python3 -c "import glob; \
-        libs = glob.glob('/mingw64/lib/libboost_regex*-mt.a'); \
-        libs = [l for l in libs if '.dll.a' not in l]; \
-        print(libs[0] if libs else '')")
-        
-        if [ -z "$REGEX_PATH" ]; then
-             echo "Regex -mt.a not found via glob, looking for any .a..."
-             REGEX_PATH=$(python3 -c "import glob; \
-             libs = glob.glob('/mingw64/lib/libboost_regex*.a'); \
-             libs = [l for l in libs if '.dll.a' not in l]; \
-             print(libs[0] if libs else '')")
-        fi
-        
-        if [ -z "$REGEX_PATH" ]; then
-             echo "Static lib not found, looking for dll.a as fallback..."
-             REGEX_PATH=$(python3 -c "import glob; \
-             libs = glob.glob('/mingw64/lib/libboost_regex*.dll.a'); \
-             print(libs[0] if libs else '')")
-        fi
-        
-        if [ -z "$REGEX_PATH" ]; then
-             echo "CRITICAL ERROR: Boost regex library not found in /mingw64/lib"
-             # List dir for debug
-             ls -C /mingw64/lib/libboost* || true
-             exit 1
-        fi
-        
-        echo "Found Boost Regex Lib at: $REGEX_PATH"
-        # Determine target name based on extension
-        if [[ "$REGEX_PATH" == *".dll.a" ]]; then
-             cp "$REGEX_PATH" local_lib/libboost_regex.dll.a
-             # Also copy as .a just in case ld wants it? No, ld prefers dll.a
+        # Check if it exists in the extracted dir first
+        LOCAL_REGEX=$(find mingw64/lib -name "libboost_regex*-mt.a" | head -n 1)
+        if [ -z "$LOCAL_REGEX" ]; then
+             echo "ERROR: Regex lib not found even in extracted package!"
+             ls -R mingw64/lib | grep regex || echo "No regex files found in package"
         else
-             cp "$REGEX_PATH" local_lib/libboost_regex.a
+             echo "Found regex in package: $LOCAL_REGEX"
+             cp "$LOCAL_REGEX" local_lib/libboost_regex.a
+        fi
+        
+        # Also let Python look in system dir just in case
+        if [ ! -f local_lib/libboost_regex.a ]; then
+            echo "Looking for boost_regex library using Python (system dir)..."
+            REGEX_PATH=$(python3 -c "import glob; \
+            libs = glob.glob('/mingw64/lib/libboost_regex*-mt.a'); \
+            libs = [l for l in libs if '.dll.a' not in l]; \
+            print(libs[0] if libs else '')")
+            
+            if [ ! -z "$REGEX_PATH" ]; then
+                cp "$REGEX_PATH" local_lib/libboost_regex.a
+            fi
+        fi
+        
+        # If still not found, try dll.a from extracted dir
+        if [ ! -f local_lib/libboost_regex.a ]; then
+             LOCAL_REGEX_DLL=$(find mingw64/lib -name "libboost_regex*.dll.a" | head -n 1)
+             if [ ! -z "$LOCAL_REGEX_DLL" ]; then
+                  cp "$LOCAL_REGEX_DLL" local_lib/libboost_regex.dll.a
+             fi
         fi
         
         LOCAL_LIB_PATH="$(pwd)/local_lib"

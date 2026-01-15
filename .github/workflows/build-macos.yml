@@ -169,6 +169,8 @@ jobs:
         wget https://github.com/uclouvain/openjpeg/archive/v2.5.0.tar.gz
         tar xf v2.5.0.tar.gz
         cd openjpeg-2.5.0
+        # Patch CMakeLists.txt for modern CMake compatibility
+        sed -i 's/cmake_minimum_required(VERSION 2.8.11)/cmake_minimum_required(VERSION 3.5)/' CMakeLists.txt
         mkdir build
         cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX
