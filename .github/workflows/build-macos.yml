@@ -163,8 +163,8 @@ jobs:
         git apply ../dcpomatic/libdcp_hdr_integration.patch
         PREFIX=$(brew --prefix)
         BOOST_PREFIX=$(brew --prefix boost)
-        # Add all suppressions to libdcp as well
-        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include -Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -std=c++11"
+        # Add all suppressions to libdcp as well. Add brute-force includes for OpenJPEG.
+        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include -I$PREFIX/include/openjpeg-2.5 -I$PREFIX/include/openjpeg-2.4 -I$PREFIX/include/openjpeg-2.3 -Wno-deprecated -Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -std=c++11"
         export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
         # Explicitly add openjpeg pkgconfig path (it might be keg-only)

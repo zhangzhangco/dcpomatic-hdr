@@ -274,11 +274,14 @@ jobs:
         export CXX=g++.exe
         export LIBPATH=/mingw64/lib
         # Workaround: waf check fails because ld can't find libraries in absolute paths if passed via -l
-        # So we create a local lib dir, copy the boost library there with the name 'libboost_regex.a' 
         # (matching -lboost_regex), and add it to search path.
         
-        echo "Reinstalling boost to ensure regex lib exists..."
-        pacman -S --needed --noconfirm mingw-w64-x86_64-boost
+        echo "Downgrading boost to 1.85.0 to ensure regex lib exists (latest might be broken)..."
+        # Remove current boost
+        pacman -R --noconfirm mingw-w64-x86_64-boost || true
+        # Install specific version cache or download
+        wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
+        pacman -U --noconfirm mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
         
         mkdir -p local_lib
         echo "Looking for boost_regex library using Python..."
