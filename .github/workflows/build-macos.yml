@@ -167,6 +167,16 @@ jobs:
         export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib"
         
         # Explicitly add openjpeg pkgconfig path (it might be keg-only)
+        # Scan for the .pc file to be sure
+        OPENJPEG_PC=$(find /usr/local /opt/homebrew -name libopenjp2.pc 2>/dev/null | head -n 1)
+        if [ ! -z "$OPENJPEG_PC" ]; then
+             OPENJPEG_PC_DIR=$(dirname "$OPENJPEG_PC")
+             echo "Found libopenjp2.pc at $OPENJPEG_PC_DIR"
+             export PKG_CONFIG_PATH="$OPENJPEG_PC_DIR:$PKG_CONFIG_PATH"
+        else
+             echo "WARNING: libopenjp2.pc not found in common locations"
+        fi
+        
         OPENJPEG_PREFIX=$(brew --prefix openjpeg)
         export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$OPENJPEG_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
         echo "PKG_CONFIG_PATH for libdcp: $PKG_CONFIG_PATH"
