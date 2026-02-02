@@ -188,7 +188,8 @@ NeuralHDR::Config::load_from_config()
             try {
                 // TODO: Replace with your actual model storage URL
                 // Example: https://github.com/StartDt/dcpomatic-hdr-models/releases/download/v1.0/
-                string base_url = "https://github.com/zhangzhangco/dcpomatic-hdr/releases/download/model-v0.1/";
+                // GitHub "latest/download" automatically redirects to the assets in the latest marked release.
+                string base_url = "https://github.com/zhangzhangco/dcpomatic-hdr/releases/latest/download/";
                 
                 download_to_file(base_url + "neural_hdr.onnx", model_p);
                 std::cout << "[NEURAL_HDR] Successfully downloaded neural_hdr.onnx" << std::endl;
