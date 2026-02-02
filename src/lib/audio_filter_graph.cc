@@ -28,6 +28,7 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/opt.h>
+#include <libavutil/version.h>
 }
 #include <iostream>
 
@@ -41,13 +42,18 @@ using std::string;
 
 
 AudioFilterGraph::AudioFilterGraph (int sample_rate, int channels)
-	: _sample_rate (sample_rate)
-	, _channels (channels)
+    : _sample_rate (sample_rate)
+    , _channels (channels)
 {
-	/* FFmpeg doesn't know any channel layouts for any counts between 8 and 16,
-	   so we need to tell it we're using 16 channels if we are using more than 8.
-	*/
-	av_channel_layout_default(&_channel_layout, _channels > 8 ? 16 : _channels);
+    /* FFmpeg doesn't know any channel layouts for any counts between 8 and 16,
+       so we need to tell it we're using 16 channels if we are using more than 8.
+     */
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+    av_channel_layout_default(&_channel_layout, _channels > 8 ? 16 : _channels);
+#else
+    _process_channels = (_channels > 8 ? 16 : _channels);
+    _channel_layout = av_get_default_channel_layout(_process_channels);
+#endif
 
 	_in_frame = av_frame_alloc ();
 	if (_in_frame == nullptr) {
@@ -63,16 +69,22 @@ AudioFilterGraph::~AudioFilterGraph()
 string
 AudioFilterGraph::src_parameters () const
 {
-	char layout[64];
-	av_channel_layout_describe(&_channel_layout, layout, sizeof(layout));
+    char buffer[256];
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+    char layout[64];
+    av_channel_layout_describe(&_channel_layout, layout, sizeof(layout));
+    snprintf(
+        buffer, sizeof(buffer), "time_base=1/1:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
+        _sample_rate, av_get_sample_fmt_name(AV_SAMPLE_FMT_FLTP), layout);
+#else
+    char layout[128];
+    av_get_channel_layout_string(layout, sizeof(layout), _process_channels, _channel_layout);
+    snprintf(
+        buffer, sizeof(buffer), "time_base=1/1:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
+        _sample_rate, av_get_sample_fmt_name(AV_SAMPLE_FMT_FLTP), layout);
+#endif
 
-	char buffer[256];
-	snprintf (
-		buffer, sizeof(buffer), "time_base=1/1:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
-		_sample_rate, av_get_sample_fmt_name(AV_SAMPLE_FMT_FLTP), layout
-		);
-
-	return buffer;
+    return buffer;
 }
 
 
@@ -85,14 +97,18 @@ AudioFilterGraph::set_parameters (AVFilterContext* context) const
 	AVSampleFormat sample_fmts[] = { AV_SAMPLE_FMT_FLTP, AV_SAMPLE_FMT_NONE };
 	int r = av_opt_set_int_list (context, "sample_fmts", sample_fmts, AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
 #endif
-	DCPOMATIC_ASSERT (r >= 0);
+    DCPOMATIC_ASSERT (r >= 0);
 
-	char ch_layout[64];
-	av_channel_layout_describe(&_channel_layout, ch_layout, sizeof(ch_layout));
-#ifdef DCPOMATIC_FFMPEG_8
-	r = av_opt_set(context, "channel_layouts", ch_layout, AV_OPT_SEARCH_CHILDREN);
+    char ch_layout[64];
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+    av_channel_layout_describe(&_channel_layout, ch_layout, sizeof(ch_layout));
 #else
-	r = av_opt_set(context, "ch_layouts", ch_layout, AV_OPT_SEARCH_CHILDREN);
+    av_get_channel_layout_string(ch_layout, sizeof(ch_layout), _process_channels, _channel_layout);
+#endif
+#ifdef DCPOMATIC_FFMPEG_8
+    r = av_opt_set(context, "channel_layouts", ch_layout, AV_OPT_SEARCH_CHILDREN);
+#else
+    r = av_opt_set(context, "ch_layouts", ch_layout, AV_OPT_SEARCH_CHILDREN);
 #endif
 	DCPOMATIC_ASSERT (r >= 0);
 
@@ -121,9 +137,14 @@ AudioFilterGraph::sink_name () const
 void
 AudioFilterGraph::process (shared_ptr<AudioBuffers> buffers)
 {
-	DCPOMATIC_ASSERT (buffers->frames() > 0);
-	int const process_channels = _channel_layout.nb_channels;
-	DCPOMATIC_ASSERT (process_channels >= buffers->channels());
+    DCPOMATIC_ASSERT (buffers->frames() > 0);
+    int const process_channels =
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+        _channel_layout.nb_channels;
+#else
+        _process_channels;
+#endif
+    DCPOMATIC_ASSERT (process_channels >= buffers->channels());
 
 	if (buffers->channels() < process_channels) {
 		/* We are processing more data than we actually have (see the hack in
@@ -149,10 +170,15 @@ AudioFilterGraph::process (shared_ptr<AudioBuffers> buffers)
 		_in_frame->extended_data[i] = reinterpret_cast<uint8_t*> (buffers->data(i));
 	}
 
-	_in_frame->nb_samples = buffers->frames ();
-	_in_frame->format = AV_SAMPLE_FMT_FLTP;
-	_in_frame->sample_rate = _sample_rate;
-	_in_frame->ch_layout = _channel_layout;
+    _in_frame->nb_samples = buffers->frames ();
+    _in_frame->format = AV_SAMPLE_FMT_FLTP;
+    _in_frame->sample_rate = _sample_rate;
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+    _in_frame->ch_layout = _channel_layout;
+#else
+    _in_frame->channel_layout = _channel_layout;
+    _in_frame->channels = process_channels;
+#endif
 
 	int r = av_buffersrc_write_frame (_buffer_src_context, _in_frame);
 

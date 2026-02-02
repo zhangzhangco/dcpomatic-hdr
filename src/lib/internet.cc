@@ -203,3 +203,36 @@ get_from_zip_url(string url, string file, bool pasv, bool skip_pasv_ip, function
 
 	return load(temp_cert.path(), url);
 }
+
+
+void
+download_to_file(string url, boost::filesystem::path file)
+{
+	auto curl = curl_easy_init();
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+
+	dcp::File f(file, "wb");
+	if (!f) {
+		throw NetworkError(fmt::format(_("Could not open file for writing: {}"), file.string()));
+	}
+
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, get_from_url_data);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, f.get());
+
+	curl_easy_setopt(curl, CURLOPT_FTP_USE_EPSV, 0);
+	curl_easy_setopt(curl, CURLOPT_FTP_USE_EPRT, 0);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+	/* 5 minutes timeout for model download */
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300);
+
+	auto const cr = curl_easy_perform(curl);
+
+	f.close();
+	curl_easy_cleanup(curl);
+	if (cr != CURLE_OK) {
+		throw NetworkError(fmt::format(_("Download failed ({})"), (int) cr));
+	}
+}

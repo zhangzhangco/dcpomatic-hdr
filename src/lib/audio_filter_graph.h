@@ -27,6 +27,7 @@
 extern "C" {
 #include <libavfilter/buffersink.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/version.h>
 }
 
 class AudioBuffers;
@@ -46,12 +47,17 @@ protected:
 	std::string sink_name () const override;
 
 private:
-	int _sample_rate;
-	int _channels;
-	AVChannelLayout _channel_layout;
-	AVFrame* _in_frame;
+    int _sample_rate;
+    int _channels;
+    /* FFmpeg >= 5 uses AVChannelLayout; older versions use channel_layout + channels */
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+    AVChannelLayout _channel_layout;
+#else
+    uint64_t _channel_layout;
+    int _process_channels;
+#endif
+    AVFrame* _in_frame;
 };
 
 
 #endif
-

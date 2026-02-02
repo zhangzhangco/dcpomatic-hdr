@@ -38,6 +38,9 @@
 #include "encode_server_description.h"
 #include "exceptions.h"
 #include "image.h"
+#include "neural_hdr.h"
+#include <dcp/gamma_transfer_function.h>
+#include <dcp/modified_gamma_transfer_function.h>
 #include "log.h"
 #include "player_video.h"
 #include "rng.h"
@@ -58,7 +61,10 @@ LIBDCP_ENABLE_WARNINGS
 #include <boost/thread.hpp>
 #include <stdint.h>
 #include <iomanip>
+#include <iomanip>
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 
 #include "i18n.h"
 
@@ -79,19 +85,21 @@ using namespace boost::placeholders;
  *  @param bit_rate Video bit rate to use.
  */
 DCPVideo::DCPVideo(
-	shared_ptr<const PlayerVideo> frame, int index, int dcp_fps, int64_t bit_rate, Resolution r
+	shared_ptr<const PlayerVideo> frame, int index, int dcp_fps, int64_t bit_rate, Resolution r, bool enable_neural_hdr
 	)
 	: _frame(frame)
 	, _index(index)
 	, _frames_per_second(dcp_fps)
 	, _video_bit_rate(bit_rate)
 	, _resolution(r)
+	, _enable_neural_hdr(enable_neural_hdr)
 {
 
 }
 
 DCPVideo::DCPVideo(shared_ptr<const PlayerVideo> frame, shared_ptr<const cxml::Node> node)
 	: _frame(frame)
+	, _enable_neural_hdr(false)
 {
 	_index = node->number_child<int>("Index");
 	_frames_per_second = node->number_child<int>("FramesPerSecond");
@@ -99,12 +107,36 @@ DCPVideo::DCPVideo(shared_ptr<const PlayerVideo> frame, shared_ptr<const cxml::N
 	_resolution = Resolution(node->optional_number_child<int>("Resolution").get_value_or(static_cast<int>(Resolution::TWO_K)));
 }
 
-#include "zhangxin_hdr.h"
-#include <dcp/gamma_transfer_function.h>
-#include <dcp/chromaticity.h>
+
+
+// === ST 2084 PQ OETF (Encoding) ===
+// Input: Linear luminance in cd/m² (nits)
+// Output: PQ code value 0-4095 (12-bit full range)
+// NOTE: This HDR pipeline is EXPERIMENTAL until MXF TransferCharacteristic UL is set (DCI HDR Addendum).
+static inline int pq_encode_12bit(float L_nits) {
+    // ST 2084 Constants
+    const float c1 = 0.8359375f;        // 3424/4096
+    const float c2 = 18.8515625f;       // 2413/128
+    const float c3 = 18.6875f;          // 2392/128
+    const float m1 = 0.1593017578125f;  // 1305/8192
+    const float m2 = 78.84375f;         // 2523/32
+    const float PQ_REF_NITS = 10000.0f; // PQ reference (hardcoded, not content peak!)
+    
+    // Clamp to non-negative and normalize
+    float Y = std::max(0.0f, L_nits) / PQ_REF_NITS;
+    
+    // Apply PQ OETF
+    float Ym = std::pow(Y, m1);
+    float num = c1 + c2 * Ym;
+    float den = 1.0f + c3 * Ym;
+    float V = std::pow(num / den, m2);  // PQ non-linear value [0,1]
+    
+    // Quantize to 12-bit full range
+    return std::clamp(static_cast<int>(V * 4095.0f + 0.5f), 0, 4095);
+}
 
 shared_ptr<dcp::OpenJPEGImage>
-DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
+DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame, bool enable_neural_hdr)
 {
 	shared_ptr<dcp::OpenJPEGImage> xyz;
 
@@ -114,48 +146,74 @@ DCPVideo::convert_to_xyz(shared_ptr<const PlayerVideo> frame)
 
 	auto image = frame->image(conversion, VideoRange::FULL, false);
 
-    // [ZHANGXIN] HDR Processor Insertion Point (Step 2)
-    ZhangxinHDR::Config hdr_config;
-    
-    if (getenv("ZHANGXIN_HDR_ENABLE")) {
-        hdr_config.enable = true;
-        hdr_config.debug_mode = (getenv("ZHANGXIN_HDR_DEBUG") != nullptr);
-        hdr_config.dump_debug_frames = (getenv("ZHANGXIN_HDR_DUMP") != nullptr);
-    }
+    // [NEURAL] HDR Processor Insertion Point
+    // NOTE: This HDR pipeline is EXPERIMENTAL until MXF TransferCharacteristic UL is set (DCI HDR Addendum).
+    NeuralHDR::Config hdr_config = NeuralHDR::Config::load_from_config();
+    hdr_config.enable = enable_neural_hdr;  // Override with per-Film setting
 
     if (hdr_config.enable) {
-        // 1. 执行受限复原
-        image = ZhangxinHDR::process(image, hdr_config);
-        
-        // 2. 构造线性色彩转换
-        dcp::ColourConversion linear_cc;
+        // === HDR Path: Direct PQ Encoding ===
+        NeuralHDR::Config frame_config = hdr_config;
+
         if (frame->colour_conversion()) {
-            linear_cc = frame->colour_conversion().get();
-        } else {
-            linear_cc = dcp::ColourConversion::rec709_to_xyz();
+             auto in_tf = frame->colour_conversion()->in();
+             // Map DCP TransferFunction to NeuralHDR TransferFunction
+             if (auto gamma_tf = std::dynamic_pointer_cast<const dcp::GammaTransferFunction>(in_tf)) {
+                 if (fabs(gamma_tf->gamma() - 2.6) < 0.1) {
+                     frame_config.transfer_function = NeuralHDR::TransferFunction::GAMMA_26;
+                 } else {
+                     frame_config.transfer_function = NeuralHDR::TransferFunction::GAMMA_24;
+                 }
+             } else if (std::dynamic_pointer_cast<const dcp::ModifiedGammaTransferFunction>(in_tf)) {
+                 // Assume this is Rec.709 or similar scene-referred
+                 frame_config.transfer_function = NeuralHDR::TransferFunction::REC709_SCENE_LINEAR;
+             }
+        }
+
+        // 1. Run HDR model: outputs linear XYZ in cd/m² (absolute luminance)
+        auto hdr_xyz = NeuralHDR::process_to_hdr_xyz(image, frame_config);
+        
+        if (hdr_xyz.width == 0 || hdr_xyz.height == 0) {
+            // Model failed, fallback to original SDR path
+            LOG_WARNING_NC("NeuralHDR: Model processing failed, falling back to SDR path");
+            goto sdr_path;
         }
         
-        linear_cc.set_in(make_shared<dcp::GammaTransferFunction>(1.0));
+        // 2. Create OpenJPEGImage and directly write PQ-encoded values
+        dcp::Size size(hdr_xyz.width, hdr_xyz.height);
+        xyz = make_shared<dcp::OpenJPEGImage>(size);
+        
+        int* x_data = xyz->data(0);  // X component
+        int* y_data = xyz->data(1);  // Y component
+        int* z_data = xyz->data(2);  // Z component
+        
+        // 3. PQ Encode all XYZ components (not just Y!)
+        int pixel_count = hdr_xyz.width * hdr_xyz.height;
+        for (int i = 0; i < pixel_count; ++i) {
+            // PQ encode each component: Linear XYZ (cd/m²) -> 12-bit X″Y″Z″
+            int pq_x = pq_encode_12bit(hdr_xyz.x[i]);
+            int pq_y = pq_encode_12bit(hdr_xyz.y[i]);
+            int pq_z = pq_encode_12bit(hdr_xyz.z[i]);
+            
+            x_data[i] = pq_x;
+            y_data[i] = pq_y;
+            z_data[i] = pq_z;
+        }
+        
+        return xyz;
+    }
 
+sdr_path:
+    // === SDR Path: Original Implementation ===
+    if (frame->colour_conversion()) {
         xyz = dcp::rgb_to_xyz(
-			image->data()[0],
-			image->size(),
-			image->stride()[0],
-			linear_cc
-			);
-
+            image->data()[0],
+            image->size(),
+            image->stride()[0],
+            frame->colour_conversion().get()
+            );
     } else {
-        // Original Path
-        if (frame->colour_conversion()) {
-            xyz = dcp::rgb_to_xyz(
-                image->data()[0],
-                image->size(),
-                image->stride()[0],
-                frame->colour_conversion().get()
-                );
-        } else {
-            xyz = make_shared<dcp::OpenJPEGImage>(image->data()[0], image->size(), image->stride()[0]);
-        }
+        xyz = make_shared<dcp::OpenJPEGImage>(image->data()[0], image->size(), image->stride()[0]);
     }
 
 	return xyz;
@@ -198,7 +256,7 @@ DCPVideo::encode_locally() const
 	int const minimum_size = 16384;
 	LOG_DEBUG_ENCODE("Using minimum frame size {}", minimum_size);
 
-	auto xyz = convert_to_xyz(_frame);
+	auto xyz = convert_to_xyz(_frame, _enable_neural_hdr);
 	int noise_amount = 2;
 	int pixel_skip = 16;
 	while (true) {
@@ -223,7 +281,7 @@ DCPVideo::encode_locally() const
 		 * convert_to_xyz() again because compress_j2k() corrupts its xyz parameter.
 		 */
 
-		xyz = convert_to_xyz(_frame);
+		xyz = convert_to_xyz(_frame, _enable_neural_hdr);
 		auto size = xyz->size();
 		auto pixels = size.width * size.height;
 		dcpomatic::RNG rng(42);

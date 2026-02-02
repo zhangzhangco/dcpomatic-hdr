@@ -135,7 +135,12 @@ def configure(conf):
                                        # I tried and failed to ignore this with _Pragma
                                        '-Wno-ignored-qualifiers',
                                        '-D_FILE_OFFSET_BITS=64',
-                                       '-std=c++' + cpp_std])
+                                       '-Wno-ignored-qualifiers',
+                                       '-D_FILE_OFFSET_BITS=64',
+                                       '-std=c++17',
+                                       '-Wno-error',               # Disable Werror to survive C++17 transition
+                                       '-Wno-suggest-override',    # Silence wxWidgets verify spam
+                                       '-Wno-deprecated-copy'])    # Silence more C++17 spam
 
     if conf.options.disable_more_warnings:
         # These are for Xcode 15.0.1 with the v2.16.x-era

@@ -81,7 +81,13 @@ FFmpegExaminer::FFmpegExaminer(shared_ptr<const FFmpegContent> c, shared_ptr<Job
 					i,
 					s->codecpar->sample_rate,
 					_need_length ? 0 : rint((double(_format_context->duration) / AV_TIME_BASE) * s->codecpar->sample_rate),
-					s->codecpar->ch_layout.nb_channels,
+                    (
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+                        s->codecpar->ch_layout.nb_channels
+#else
+                        s->codecpar->channels
+#endif
+                    ),
 					s->codecpar->bits_per_raw_sample ? s->codecpar->bits_per_raw_sample : s->codecpar->bits_per_coded_sample
 					)
 				);
@@ -194,10 +200,14 @@ FFmpegExaminer::FFmpegExaminer(shared_ptr<const FFmpegContent> c, shared_ptr<Job
 			}
 		}
 
-		auto side_data = av_packet_side_data_get(stream->codecpar->coded_side_data, stream->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
-		if (side_data && !_rotation) {
-			_rotation = - av_display_rotation_get(reinterpret_cast<int32_t*>(side_data->data));
-		}
+    // Prefer av_stream_get_side_data for broader FFmpeg compatibility
+    {
+            int side_size = 0;
+            auto side = av_stream_get_side_data(stream, AV_PKT_DATA_DISPLAYMATRIX, &side_size);
+            if (side && !_rotation) {
+                    _rotation = - av_display_rotation_get(reinterpret_cast<int32_t*>(side));
+            }
+    }
 
 		if (_rotation) {
 			_rotation = *_rotation - 360 * floor(*_rotation / 360 + 0.9 / 360);
@@ -293,7 +303,15 @@ FFmpegExaminer::video_packet(AVCodecContext* context, string& temporal_reference
 			).get_value_or({}).frames_round(video_frame_rate().get()) + 1;
 	}
 	if (temporal_reference.size() < (PULLDOWN_CHECK_FRAMES * 2)) {
-		temporal_reference += ((_video_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? "T" : "B");
+        {
+                bool top_first = false;
+#ifdef AV_FRAME_FLAG_TOP_FIELD_FIRST
+                top_first = (_video_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST);
+#else
+                top_first = _video_frame->top_field_first;
+#endif
+                temporal_reference += (top_first ? "T" : "B");
+        }
 		temporal_reference += (_video_frame->repeat_pict ? "3" : "2");
 	}
 
@@ -555,4 +573,3 @@ FFmpegExaminer::pixel_quanta() const
 	DCPOMATIC_ASSERT(desc);
 	return { 1 << desc->log2_chroma_w, 1 << desc->log2_chroma_h };
 }
-

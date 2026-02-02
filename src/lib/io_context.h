@@ -28,8 +28,6 @@
 
 namespace dcpomatic {
 
-#ifdef DCPOMATIC_HAVE_BOOST_ASIO_IO_CONTEXT
-
 using io_context = boost::asio::io_context;
 using work_guard = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
 
@@ -41,22 +39,6 @@ void post(io_context& context, T handler)
 
 work_guard
 make_work_guard(io_context& context);
-
-#else
-
-using io_context = boost::asio::io_service;
-using work_guard = boost::asio::io_service::work;
-
-template <typename T>
-void post(io_context& context, T handler)
-{
-	context.post(handler);
-}
-
-work_guard
-make_work_guard(io_context& context);
-
-#endif
 
 }
 

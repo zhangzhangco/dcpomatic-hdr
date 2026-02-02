@@ -209,6 +209,7 @@ Config::set_defaults()
 	_initial_paths["Preferences"] = boost::none;
 	_initial_paths["SaveVerificationReport"] = boost::none;
 	_initial_paths["CopySettingsPath"] = boost::none;
+	_initial_paths["NeuralHDRModelPath"] = boost::none;
 	_use_isdcf_name_by_default = true;
 	_write_kdms_to_disk = true;
 	_email_kdms = false;
@@ -222,6 +223,9 @@ Config::set_defaults()
 	_player_http_server_port = 8080;
 	_relative_paths = false;
 	_layout_for_short_screen = false;
+	_neural_hdr_enable = false;
+
+	_neural_hdr_hue_lock = true;
 
 	_allowed_dcp_frame_rates.clear();
 	_allowed_dcp_frame_rates.push_back(24);
@@ -668,6 +672,9 @@ try
 	_player_http_server_port = f.optional_number_child<int>("PlayerHTTPServerPort").get_value_or(8080);
 	_relative_paths = f.optional_bool_child("RelativePaths").get_value_or(false);
 	_layout_for_short_screen = f.optional_bool_child("LayoutForShortScreen").get_value_or(false);
+	_neural_hdr_enable = f.optional_bool_child("NeuralHDREnable").get_value_or(false);
+
+	_neural_hdr_hue_lock = f.optional_bool_child("NeuralHDRHueLock").get_value_or(false);
 
 #ifdef DCPOMATIC_GROK
 	if (auto grok = f.optional_node_child("Grok")) {
@@ -981,6 +988,7 @@ Config::write_config() const
 	}
 	/* [XML] CoverSheet Text of the cover sheet to write when making DCPs. */
 	cxml::add_text_child(root, "CoverSheet", _cover_sheet);
+
 	if (_last_player_load_directory) {
 		cxml::add_text_child(root, "LastPlayerLoadDirectory", _last_player_load_directory->string());
 	}
@@ -1157,6 +1165,12 @@ Config::write_config() const
 	cxml::add_text_child(root, "RelativePaths", _relative_paths ? "1" : "0");
 	/* [XML] LayoutForShortScreen 1 to set up DCP-o-matic as if the screen were less than 800 pixels high */
 	cxml::add_text_child(root, "LayoutForShortScreen", _layout_for_short_screen ? "1" : "0");
+
+	/* [XML] NeuralHDREnable 1 to enable Neural HDR processing, otherwise 0 */
+	cxml::add_text_child(root, "NeuralHDREnable", _neural_hdr_enable ? "1" : "0");
+
+	/* [XML] NeuralHDRHueLock 1 to enable Hue Lock (Gain Map mode), otherwise 0 */
+	cxml::add_text_child(root, "NeuralHDRHueLock", _neural_hdr_hue_lock ? "1" : "0");
 
 #ifdef DCPOMATIC_GROK
 	_grok.as_xml(cxml::add_child(root, "Grok"));

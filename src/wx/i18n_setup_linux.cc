@@ -45,6 +45,11 @@ dcpomatic::wx::setup_i18n()
 
 		locale->AddCatalogLookupPathPrefix(std_to_wx(LINUX_LOCALE_PREFIX));
 
+		/* Development build paths */
+		locale->AddCatalogLookupPathPrefix(char_to_wx("build/src/wx/mo"));
+		locale->AddCatalogLookupPathPrefix(char_to_wx("build/src/tools/mo"));
+		locale->AddCatalogLookupPathPrefix(char_to_wx("build/src/lib/mo"));
+
 		/* We have to include the wxWidgets .mo in our distribution,
 		   so we rename it to avoid clashes with any other installation
 		   of wxWidgets.

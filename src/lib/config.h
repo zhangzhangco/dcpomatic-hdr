@@ -689,6 +689,16 @@ public:
 		return _layout_for_short_screen;
 	}
 
+	bool neural_hdr_enable() const {
+		return _neural_hdr_enable;
+	}
+
+
+
+	bool neural_hdr_hue_lock() const {
+		return _neural_hdr_hue_lock;
+	}
+
 	/* SET (mostly) */
 
 	void set_master_encoding_threads(int n) {
@@ -1266,6 +1276,22 @@ public:
 	}
 
 
+
+
+	void set_neural_hdr_enable(bool e) {
+		maybe_set(_neural_hdr_enable, e);
+	}
+
+
+
+	void set_neural_hdr_hue_lock(bool h) {
+		maybe_set(_neural_hdr_hue_lock, h);
+	}
+
+
+
+
+
 	void changed(Property p = OTHER);
 	boost::signals2::signal<void (Property)> Changed;
 	/** Emitted if read() failed on an existing Config file.  There is nothing
@@ -1512,6 +1538,9 @@ private:
 	int _player_http_server_port;
 	bool _relative_paths;
 	bool _layout_for_short_screen;
+	bool _neural_hdr_enable = false;
+
+	bool _neural_hdr_hue_lock = false;
 
 #ifdef DCPOMATIC_GROK
 	Grok _grok;

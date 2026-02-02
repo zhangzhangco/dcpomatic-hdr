@@ -21,6 +21,7 @@
 
 #include <wx/wx.h>
 #include <memory>
+#include <functional>
 
 
 namespace dcp {

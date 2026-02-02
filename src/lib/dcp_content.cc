@@ -255,6 +255,7 @@ DCPContent::examine(shared_ptr<const Film> film, shared_ptr<Job> job, bool toler
 			video = make_shared<VideoContent>(this);
 		}
 		video->take_from_examiner(film, examiner);
+		video->set_video_is_hdr(examiner->video_is_hdr());
 		set_default_colour_conversion();
 	}
 

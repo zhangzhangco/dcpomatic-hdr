@@ -42,3 +42,4 @@ boost::optional<std::string> get_from_zip_url(
 	);
 
 std::list<std::string> ls_url(std::string url);
+void download_to_file(std::string url, boost::filesystem::path file);

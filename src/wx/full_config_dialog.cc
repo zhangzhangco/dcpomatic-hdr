@@ -1481,6 +1481,75 @@ private:
 };
 
 
+class NeuralHDRPage : public preferences::Page
+{
+public:
+	NeuralHDRPage(wxSize panel_size, int border)
+		: Page(panel_size, border)
+	{}
+
+	wxString GetName() const override
+	{
+		return _("Neural HDR");
+	}
+
+#ifdef DCPOMATIC_OSX
+	wxBitmap GetLargeIcon() const override
+	{
+		return wxBitmap(icon_path("advanced"), wxBITMAP_TYPE_PNG);
+	}
+#endif
+
+private:
+	void setup() override
+	{
+		auto table = new wxFlexGridSizer(2, DCPOMATIC_SIZER_X_GAP, DCPOMATIC_SIZER_Y_GAP);
+		table->AddGrowableCol(1, 1);
+		_panel->GetSizer()->Add(table, 1, wxALL | wxEXPAND, _border);
+
+		_enable = new CheckBox(_panel, _("Enable Neural HDR Processing"));
+		table->Add(_enable, 1, wxEXPAND | wxALL);
+		table->AddSpacer(0);
+
+
+
+		_hue_lock = new CheckBox(_panel, _("Enable Hue Lock Strategy"));
+		_hue_lock->SetToolTip(_("This option is required for the standard model."));
+		_hue_lock->Enable(false);
+		table->Add(_hue_lock, 1, wxEXPAND | wxALL);
+		table->AddSpacer(0);
+
+		_enable->bind(&NeuralHDRPage::enable_changed, this);
+
+		_hue_lock->bind(&NeuralHDRPage::hue_lock_changed, this);
+	}
+
+	void config_changed() override
+	{
+		auto config = Config::instance();
+		checked_set(_enable, config->neural_hdr_enable());
+
+		checked_set(_hue_lock, config->neural_hdr_hue_lock());
+	}
+
+	void enable_changed()
+	{
+		Config::instance()->set_neural_hdr_enable(_enable->GetValue());
+	}
+
+
+
+	void hue_lock_changed()
+	{
+		Config::instance()->set_neural_hdr_hue_lock(_hue_lock->GetValue());
+	}
+
+	CheckBox* _enable;
+
+	CheckBox* _hue_lock;
+};
+
+
 wxPreferencesEditor*
 create_full_config_dialog()
 {
@@ -1514,5 +1583,6 @@ create_full_config_dialog()
 	e->AddPage(new IdentifiersPage(ps, border));
 	e->AddPage(new NonStandardPage(ps, border));
 	e->AddPage(new AdvancedPage(ps, border));
+	e->AddPage(new NeuralHDRPage(ps, border));
 	return e;
 }

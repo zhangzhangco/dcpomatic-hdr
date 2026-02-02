@@ -47,6 +47,42 @@ using dcp::Data;
 using namespace dcpomatic;
 
 
+static std::vector<int> _pq_to_gamma26_lut;
+static boost::mutex _pq_to_gamma26_lut_mutex;
+
+static void ensure_pq_to_gamma26_lut()
+{
+	boost::mutex::scoped_lock lm(_pq_to_gamma26_lut_mutex);
+	if (!_pq_to_gamma26_lut.empty()) {
+		return;
+	}
+
+	_pq_to_gamma26_lut.resize(4096);
+
+	/* ST 2084 Constants */
+	float const c1 = 0.8359375f;
+	float const c2 = 18.8515625f;
+	float const c3 = 18.6875f;
+	float const m1 = 0.1593017578125f;
+	float const m2 = 78.84375f;
+
+	for (int i = 0; i < 4096; ++i) {
+		float const N = i / 4095.0f;
+		float const N_m2 = std::pow(N, 1.0f / m2);
+		float const num = std::max(N_m2 - c1, 0.0f);
+		float const den = c2 - c3 * N_m2;
+		float const L_nits = std::pow(num / den, 1.0f / m1) * 10000.0f;
+
+		/* Tone map: simple scaling to 300 nits peak */
+		float const L_sdr = L_nits / 300.0f;
+
+		/* Gamma 2.6 encode */
+		float const v = std::pow(L_sdr, 1.0f / 2.6f);
+		_pq_to_gamma26_lut[i] = std::clamp(static_cast<int>(v * 4095.0f + 0.5f), 0, 4095);
+	}
+}
+
+
 PlayerVideo::PlayerVideo(
 	shared_ptr<const ImageProxy> in,
 	Crop crop,
@@ -149,6 +185,114 @@ PlayerVideo::make_image(function<AVPixelFormat (AVPixelFormat)> pixel_format, Vi
 
 	auto prox = _in->image(Image::Alignment::PADDED, _inter_size);
 	_error = prox.error;
+
+	/* Handle HDR tone mapping if required */
+	/* HDR Preview Pipeline: PQ XYZ (P3 D65) -> Linear XYZ -> Tone Map -> sRGB (Rec.709 D65) */
+	if (_content.lock() && _content.lock()->video && _content.lock()->video->video_is_hdr() && prox.image->pixel_format() == AV_PIX_FMT_XYZ12LE) {
+		int const w = prox.image->size().width;
+		int const h = prox.image->size().height;
+		int const stride_bytes = prox.image->stride()[0];
+
+		/* Output as RGB48LE instead of XYZ12LE to bypass SDR color conversion pipeline */
+		auto srgb_out = make_shared<Image>(AV_PIX_FMT_RGB48LE, prox.image->size(), prox.image->alignment());
+
+		uint8_t* in_p = prox.image->data()[0];
+		uint8_t* out_p = srgb_out->data()[0];
+		int const out_stride = srgb_out->stride()[0];
+
+		/* ST 2084 Constants for PQ EOTF (Inverse of OETF) */
+		float const c1 = 0.8359375f;
+		float const c2 = 18.8515625f;
+		float const c3 = 18.6875f;
+		float const m1 = 0.1593017578125f;
+		float const m2 = 78.84375f;
+
+		/* XYZ D65 -> Linear P3 D65 */
+		float const M_XYZ_P3[9] = {
+			 2.49349691f, -0.93138362f, -0.40271078f,
+			-0.82948897f,  1.76266406f,  0.02362469f,
+			 0.03584583f, -0.07617239f,  0.95688452f
+		};
+
+		/* P3 D65 -> Rec.709 D65 (same white point, only primaries change) */
+		/* This matrix converts linear P3 to linear Rec.709 */
+		float const M_P3_709[9] = {
+			 1.2249f, -0.2249f,  0.0000f,
+			-0.0420f,  1.0420f,  0.0000f,
+			-0.0197f, -0.0786f,  1.0983f
+		};
+
+		for (int y = 0; y < h; ++y) {
+			uint16_t* in_line = reinterpret_cast<uint16_t*>(in_p);
+			uint16_t* out_line = reinterpret_cast<uint16_t*>(out_p);
+
+			for (int x = 0; x < w; ++x) {
+				/* Read XYZ12LE (12-bit in 16-bit, MSB aligned) */
+				float X_pq = (in_line[x * 3 + 0] >> 4) / 4095.0f;
+				float Y_pq = (in_line[x * 3 + 1] >> 4) / 4095.0f;
+				float Z_pq = (in_line[x * 3 + 2] >> 4) / 4095.0f;
+
+				/* PQ EOTF: Decode to linear luminance (cd/m²) */
+				auto pq_eotf = [&](float N) -> float {
+					if (N <= 0.0f) return 0.0f;
+					float N_pow = std::pow(N, 1.0f / m2);
+					float num = std::max(N_pow - c1, 0.0f);
+					float den = c2 - c3 * N_pow;
+					if (den <= 0.0f) return 0.0f;
+					return std::pow(num / den, 1.0f / m1) * 10000.0f;
+				};
+
+				float X_nits = pq_eotf(X_pq);
+				float Y_nits = pq_eotf(Y_pq);
+				float Z_nits = pq_eotf(Z_pq);
+
+				/* Tone Mapping: Simple linear scaling to 300 nits -> 1.0 */
+				float const tone_scale = 1.0f / 300.0f;
+				float X_lin = X_nits * tone_scale;
+				float Y_lin = Y_nits * tone_scale;
+				float Z_lin = Z_nits * tone_scale;
+
+				/* XYZ D65 -> Linear P3 D65 */
+				float P3_R = X_lin * M_XYZ_P3[0] + Y_lin * M_XYZ_P3[1] + Z_lin * M_XYZ_P3[2];
+				float P3_G = X_lin * M_XYZ_P3[3] + Y_lin * M_XYZ_P3[4] + Z_lin * M_XYZ_P3[5];
+				float P3_B = X_lin * M_XYZ_P3[6] + Y_lin * M_XYZ_P3[7] + Z_lin * M_XYZ_P3[8];
+
+				/* P3 D65 -> Rec.709 D65 (Gamut Compression) */
+				float R_709 = P3_R * M_P3_709[0] + P3_G * M_P3_709[1] + P3_B * M_P3_709[2];
+				float G_709 = P3_R * M_P3_709[3] + P3_G * M_P3_709[4] + P3_B * M_P3_709[5];
+				float B_709 = P3_R * M_P3_709[6] + P3_G * M_P3_709[7] + P3_B * M_P3_709[8];
+
+				/* Clamp to [0, 1] (simple gamut clipping) */
+				R_709 = std::max(0.0f, std::min(1.0f, R_709));
+				G_709 = std::max(0.0f, std::min(1.0f, G_709));
+				B_709 = std::max(0.0f, std::min(1.0f, B_709));
+
+				/* sRGB OETF (IEC 61966-2-1) */
+				auto srgb_oetf = [](float L) -> float {
+					if (L <= 0.0031308f) {
+						return L * 12.92f;
+					} else {
+						return 1.055f * std::pow(L, 1.0f / 2.4f) - 0.055f;
+					}
+				};
+
+				float sR = srgb_oetf(R_709);
+				float sG = srgb_oetf(G_709);
+				float sB = srgb_oetf(B_709);
+
+				/* Write RGB48LE (16-bit per channel) */
+				out_line[x * 3 + 0] = static_cast<uint16_t>(sR * 65535.0f + 0.5f);
+				out_line[x * 3 + 1] = static_cast<uint16_t>(sG * 65535.0f + 0.5f);
+				out_line[x * 3 + 2] = static_cast<uint16_t>(sB * 65535.0f + 0.5f);
+			}
+
+			in_p += stride_bytes;
+			out_p += out_stride;
+		}
+
+		/* Replace input with our sRGB output - bypass SDR color pipeline */
+		prox.image = srgb_out;
+	}
 
 	auto total_crop = _crop;
 	switch (_part) {

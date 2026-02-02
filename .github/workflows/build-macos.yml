@@ -1,0 +1,293 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug build'
+        required: false
+        default: 'false'
+
+env:
+  LIBDCP_VERSION: v1.10.45
+  LIBSUB_VERSION: v1.6.58
+  LIBCXML_VERSION: v0.17.7
+  ASDCPLIB_VERSION: carl-2.13.4-dcpomatic
+  ONNXRUNTIME_VERSION: 1.19.2
+
+jobs:
+  # ============================================================================
+  # macOS Build
+  # ============================================================================
+  build-macos:
+    name: macOS (ARM64/M1)
+    runs-on: macos-14
+    
+    steps:
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        path: dcpomatic
+
+    - name: Install Dependencies via Homebrew
+      run: |
+        brew update
+        brew install \
+          boost wxwidgets libxml2 xmlsec1 openssl@3 curl libzip libssh \
+          pangomm cairomm libsndfile libsamplerate icu4c nettle x264 sqlite \
+          xerces-c libharu fmt nanomsg pkg-config autoconf automake libtool cmake gettext ffmpeg rtaudio glib meson ninja
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib (macOS)
+      run: |
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libsigc++ 2.10 (Manual build for macOS) ----
+    - name: Build libsigc++ 2.10 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/libsigc++/2.10/libsigc++-2.10.8.tar.xz
+        tar xf libsigc++-2.10.8.tar.xz
+        cd libsigc++-2.10.8
+        mkdir -p build
+        meson setup build --prefix=/usr/local
+        ninja -C build
+        sudo ninja -C build install
+
+    # ---- Build glibmm 2.66 (Manual build for macOS) ----
+    - name: Build glibmm 2.66 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/glibmm/2.66/glibmm-2.66.6.tar.xz
+        tar xf glibmm-2.66.6.tar.xz
+        cd glibmm-2.66.6
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        mkdir -p build
+        meson setup build --prefix=/usr/local
+        ninja -C build
+        sudo ninja -C build install
+
+    # ---- Build libxml++ 2.6 (Manual build for macOS) ----
+    - name: Build libxml++ 2.6 (macOS)
+      run: |
+        wget https://download.gnome.org/sources/libxml++/2.40/libxml++-2.40.1.tar.xz
+        tar xf libxml++-2.40.1.tar.xz
+        cd libxml++-2.40.1
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+    # ---- Build cairomm 1.0 (Manual build for macOS) ----
+    - name: Build cairomm 1.0 (macOS)
+      run: |
+        wget https://cairographics.org/releases/cairomm-1.12.2.tar.gz
+        tar xf cairomm-1.12.2.tar.gz
+        cd cairomm-1.12.2
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+    # ---- Build pangomm 1.4 (Manual build for macOS) ----
+    - name: Build pangomm 1.4 (macOS)
+      run: |
+        # Use pangomm 2.46.3 (last version providing pangomm-1.4 API) for compatibility with newer Pango
+        wget https://download.gnome.org/sources/pangomm/2.46/pangomm-2.46.3.tar.xz
+        tar xf pangomm-2.46.3.tar.xz
+        cd pangomm-2.46.3
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -std=c++11"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        
+        # Pangomm 2.46 uses Meson
+        mkdir -p build
+        meson setup build --prefix=/usr/local
+        ninja -C build
+        sudo ninja -C build install
+
+    # ---- Build libcxml ----
+    - name: Build libcxml (macOS)
+      run: |
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        # Force a tag to ensure version detection works
+        git tag -f v0.17.10
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Install fast_float (required by libdcp) ----
+    - name: Install fast_float (macOS)
+      run: |
+        git clone https://github.com/fastfloat/fast_float.git fast_float
+        cd fast_float
+        sudo mkdir -p /usr/local/include/fast_float
+        sudo cp -r include/fast_float/* /usr/local/include/fast_float/
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp with HDR Patch (macOS)
+      run: |
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        git tag -f v1.10.0
+        # Apply patch for neural HDR integration
+        git apply ../dcpomatic/libdcp_hdr_integration.patch
+        PREFIX=$(brew --prefix)
+        BOOST_PREFIX=$(brew --prefix boost)
+        
+        # Manual OpenJPEG Build (since brew is failing us)
+        echo "Building OpenJPEG from source..."
+        wget https://github.com/uclouvain/openjpeg/archive/v2.5.0.tar.gz
+        tar xf v2.5.0.tar.gz
+        cd openjpeg-2.5.0
+        # Patch CMakeLists.txt for modern CMake compatibility
+        sed -i 's/cmake_minimum_required(VERSION 2.8.11)/cmake_minimum_required(VERSION 3.5)/' CMakeLists.txt
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+        cd ../..
+        
+        # Add all suppressions and includes
+        export CXXFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include -I$PREFIX/include/openjpeg-2.5 -Wno-deprecated -Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -std=c++11"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
+        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
+        
+        # Explicitly add openjpeg pkgconfig path (from our manual install)
+        export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        
+        ./waf configure --prefix=/usr/local --disable-benchmarks --disable-dumpimage --disable-tests --disable-examples
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build libsub ----
+    - name: Build libsub (macOS)
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        git tag -f v1.6.58
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations -std=c++11"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt (macOS)
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
+        PREFIX=$(brew --prefix)
+        export CXXFLAGS="-I$PREFIX/include -Wno-deprecated-declarations"
+        export CPPFLAGS="-I$PREFIX/include"
+        export LDFLAGS="-L$PREFIX/lib -lsndfile"
+        export LINKFLAGS="-lsndfile"
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+        ./waf configure --prefix=/usr/local
+        ./waf build
+        sudo ./waf install
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime (macOS)
+      run: |
+        wget -q https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        tar -xzf onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}.tgz
+        sudo cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/include/* /usr/local/include/
+        sudo cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib/* /usr/local/lib/
+        
+        mkdir -p dcpomatic/deps/onnxruntime
+        cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/include dcpomatic/deps/onnxruntime/
+        cp -r onnxruntime-osx-arm64-${{ env.ONNXRUNTIME_VERSION }}/lib dcpomatic/deps/onnxruntime/
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic (macOS)
+      run: |
+        # Patch libxml++ headers for C++17 compatibility (replace removed auto_ptr with unique_ptr)
+        echo "Patching libxml++ headers..."
+        find /usr/local/include/libxml++-2.6 -name "*.h" -print0 | xargs -0 sudo sed -i '' 's/std::auto_ptr/std::unique_ptr/g'
+        
+        cd dcpomatic
+        PREFIX=$(brew --prefix)
+        BOOST_PREFIX=$(brew --prefix boost)
+        ICU_PREFIX=$(brew --prefix icu4c)
+        
+        echo "=== BOOST DIAGNOSTICS ==="
+        echo "BOOST_PREFIX: $BOOST_PREFIX"
+        ls -la $BOOST_PREFIX/lib/libboost_system* 2>/dev/null || echo "No boost_system libs in BOOST_PREFIX"
+        ls -la $PREFIX/lib/libboost_system* 2>/dev/null || echo "No boost_system libs in PREFIX"
+        
+        # Find pangomm pkgconfig (could be pangomm-1.4, pangomm-2.44, pangomm-2.48)
+        echo "=== PANGOMM DIAGNOSTICS ==="
+        PANGOMM_PREFIX=$(brew --prefix pangomm@2.46)
+        echo "PANGOMM_PREFIX: $PANGOMM_PREFIX"
+        ls -la $PANGOMM_PREFIX/lib/pkgconfig/*.pc 2>/dev/null || echo "No pc files in lib/pkgconfig"
+        ls -la $PANGOMM_PREFIX/libexec/lib/pkgconfig/*.pc 2>/dev/null || echo "No pc files in libexec/lib/pkgconfig"
+        
+        # Also check default pkgconfig
+        echo "Looking for pangomm in default pkgconfig..."
+        pkg-config --list-all | grep -i pango || echo "No pangomm in pkg-config"
+        
+        CAIROMM_PREFIX=$(brew --prefix cairomm@1.14)
+        
+        # Build PKG_CONFIG_PATH with all possible locations
+        export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PREFIX/lib/pkgconfig:$BOOST_PREFIX/lib/pkgconfig:$ICU_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/lib/pkgconfig:$PANGOMM_PREFIX/libexec/lib/pkgconfig:$CAIROMM_PREFIX/lib/pkgconfig:$CAIROMM_PREFIX/libexec/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export LDFLAGS="-L/usr/local/lib -L$PREFIX/lib -L$BOOST_PREFIX/lib"
+        export CPPFLAGS="-I/usr/local/include -I$PREFIX/include -I$BOOST_PREFIX/include"
+        # Force Boost IoContext and Resolver Results (for Boost 1.86+)
+        # Add -Wno-mismatched-tags for libxml++ headers
+        export CXXFLAGS="-Wno-deprecated-declarations -Wno-inconsistent-missing-override -Wno-unused-private-field -Wno-unused-variable -Wno-mismatched-tags -DDCPOMATIC_HAVE_BOOST_ASIO_IO_CONTEXT -DDCPOMATIC_HAVE_BOOST_ASIO_IP_BASIC_RESOLVER_RESULTS"
+        
+        echo "PKG_CONFIG_PATH: $PKG_CONFIG_PATH"
+        
+        ./waf configure --prefix=/usr/local --disable-tests --static-boost || (cat build/config.log && exit 1)
+        ./waf build -j$(sysctl -n hw.ncpu)
+
+    - name: Package macOS Build
+      run: |
+        mkdir -p artifacts/macos
+        cp dcpomatic/build/src/tools/dcpomatic2 artifacts/macos/
+        cp dcpomatic/build/src/tools/dcpomatic2_player artifacts/macos/
+        cp /usr/local/lib/libonnxruntime* artifacts/macos/ || true
+        cd artifacts
+        tar -czvf dcpomatic-neural-hdr-macos-x64.tar.gz macos/
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-macos-x64
+        path: artifacts/dcpomatic-neural-hdr-macos-x64.tar.gz

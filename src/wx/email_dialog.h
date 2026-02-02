@@ -21,6 +21,8 @@
 
 #include "table_dialog.h"
 #include <boost/optional.hpp>
+#include <vector>
+#include <string>
 
 
 class EmailDialog : public TableDialog
@@ -34,4 +36,3 @@ public:
 private:
 	wxTextCtrl* _email;
 };
-

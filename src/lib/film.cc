@@ -485,6 +485,11 @@ Film::metadata(bool with_content_paths) const
 	if (_audio_language) {
 		cxml::add_text_child(root, "AudioLanguage", _audio_language->as_string());
 	}
+	
+	// [ZHANGXIN] HDR Configuration
+	cxml::add_text_child(root, "EnableNeuralHDR", _enable_neural_hdr ? "1" : "0");
+	cxml::add_text_child(root, "HDRWhiteNits", fmt::to_string(_hdr_white_nits));
+	
 	_playlist->as_xml(
 		cxml::add_child(root, "Playlist"),
 		with_content_paths,
@@ -709,15 +714,17 @@ Film::read_metadata(optional<boost::filesystem::path> path)
 
 	/* Disable guessing for files made in previous DCP-o-matic versions */
 	_user_explicit_container = f.optional_bool_child("UserExplicitContainer").get_value_or(true);
-	_user_explicit_resolution = f.optional_bool_child("UserExplicitResolution").get_value_or(true);
-	_user_explicit_interop = f.optional_bool_child("UserExplicitInterop").get_value_or(true);
+	_user_explicit_resolution = f.optional_bool_child("UserExplicitResolution").get_value_or(false);
+	_user_explicit_interop = f.optional_bool_child("UserExplicitInterop").get_value_or(false);
 
 	auto audio_language = f.optional_string_child("AudioLanguage");
 	if (audio_language) {
 		_audio_language = dcp::LanguageTag(*audio_language);
-	} else {
-		_audio_language = boost::none;
 	}
+	
+	// [ZHANGXIN] HDR Configuration
+	_enable_neural_hdr = f.optional_bool_child("EnableNeuralHDR").get_value_or(false);
+	_hdr_white_nits = f.optional_number_child<float>("HDRWhiteNits").get_value_or(300.0f);
 
 	/* Read the old ISDCFMetadata tag from 2.14.x metadata */
 	auto isdcf = f.optional_node_child("ISDCFMetadata");
@@ -1309,6 +1316,21 @@ Film::set_limit_to_smpte_bv20(bool limit)
 	_limit_to_smpte_bv20 = limit;
 }
 
+
+// [ZHANGXIN] HDR Configuration
+void
+Film::set_enable_neural_hdr(bool e)
+{
+	FilmChangeSignaller cc(this, FilmProperty::ENABLE_NEURAL_HDR);
+	_enable_neural_hdr = e;
+}
+
+void
+Film::set_hdr_white_nits(float n)
+{
+	FilmChangeSignaller cc(this, FilmProperty::HDR_WHITE_NITS);
+	_hdr_white_nits = n;
+}
 
 void
 Film::set_audio_processor(AudioProcessor const * processor)

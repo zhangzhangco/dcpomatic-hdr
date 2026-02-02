@@ -1,0 +1,435 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug build'
+        required: false
+        default: 'false'
+
+env:
+  LIBDCP_VERSION: v1.10.45
+  LIBSUB_VERSION: v1.6.58
+  LIBCXML_VERSION: v0.17.7
+  ASDCPLIB_VERSION: carl-2.13.4-dcpomatic
+  ONNXRUNTIME_VERSION: 1.19.2
+
+jobs:
+  # ============================================================================
+  # Windows Build (MSYS2)
+  # ============================================================================
+  build-windows:
+    name: Windows (64-bit)
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-boost
+          mingw-w64-x86_64-wxwidgets3.2-msw
+          mingw-w64-x86_64-libxml++2.6
+          mingw-w64-x86_64-xmlsec
+          mingw-w64-x86_64-openssl
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-libzip
+          mingw-w64-x86_64-libssh
+          mingw-w64-x86_64-pango
+          mingw-w64-x86_64-cairo
+          mingw-w64-x86_64-libsndfile
+          mingw-w64-x86_64-libsamplerate
+          mingw-w64-x86_64-icu
+          mingw-w64-x86_64-nettle
+          mingw-w64-x86_64-x264
+          mingw-w64-x86_64-sqlite3
+          mingw-w64-x86_64-xerces-c
+          mingw-w64-x86_64-libharu
+          mingw-w64-x86_64-fmt
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ffmpeg
+          mingw-w64-x86_64-rtaudio
+          mingw-w64-x86_64-python
+          git patch python3 autoconf automake libtool pkg-config
+
+    - name: Checkout DCP-o-matic
+      uses: actions/checkout@v4
+      with:
+        path: dcpomatic
+
+    # ---- Create Boost symlinks (MinGW uses -mt suffix) ----
+    - name: Create Boost Library Symlinks (Windows)
+      run: |
+        echo "Creating Boost symlinks..."
+        cd /mingw64/lib
+        for f in libboost_*-mt.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.a/.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        for f in libboost_*-mt.dll.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.dll.a/.dll.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        
+        # Boost System is header-only in recent versions, but waf checks for the library.
+        # Create a dummy library to satisfy the check.
+        if [ ! -f "libboost_system-mt.a" ]; then
+            echo "Creating dummy libboost_system-mt.a for header-only boost::system"
+            echo "" > dummy.c
+            gcc -c dummy.c -o dummy.o
+            ar rc libboost_system-mt.a dummy.o
+            ranlib libboost_system-mt.a
+            cp libboost_system-mt.a libboost_system.a
+        fi
+        
+        echo "Boost symlinks created:"
+        ls -la libboost_system* libboost_filesystem* libboost_regex* 2>/dev/null | head -20 || echo "Some libs not found"
+
+    # ---- Build asdcplib ----
+    - name: Build asdcplib (Windows)
+      run: |
+        echo "Diagnostics:"
+        which g++
+        g++ --version
+        echo "int main() { return 0; }" > test.cpp
+        g++ test.cpp -o test.exe
+        ./test.exe && echo "Basic compilation works"
+        
+        git clone --branch dcpomatic-2.13.0 https://github.com/cth103/asdcplib.git asdcplib
+        cd asdcplib
+        sed -i "s/load('msvc')/load('g++')/g" wscript
+        sed -i 's/load("msvc")/load("g++")/g' wscript
+        sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
+        sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        export CXXFLAGS="-DKM_WIN32 -Wno-deprecated-declarations"
+        export CXX=g++.exe
+        export CC=gcc.exe
+        export AR=ar.exe
+        python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
+        python3 waf build
+        python3 waf install
+        
+        echo "=== DIAGNOSTICS ASDCPLIB ==="
+        find /mingw64 -name "libasdcp*" 2>/dev/null || echo "No libasdcp files found"
+        ls -la /mingw64/lib/pkgconfig/ 2>/dev/null || echo "No pkgconfig dir"
+        
+        # Fallback: Create pkg-config file if it doesn't exist
+        if [ ! -f /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc ]; then
+          echo "Creating libasdcp-dcpomatic.pc manually..."
+          mkdir -p /mingw64/lib/pkgconfig
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "includedir=\${prefix}/include/libasdcp-dcpomatic" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Name: libasdcp-dcpomatic" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Description: AS-DCP File Access Library" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Version: 2.13.0" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Libs: -L\${libdir} -lasdcp-dcpomatic -lkumu-dcpomatic" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+          echo "Created libasdcp-dcpomatic.pc"
+        fi
+        
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        pkg-config --list-all | grep asdcp || echo "asdcp not in pkg-config"
+        cat /mingw64/lib/pkgconfig/libasdcp-dcpomatic.pc
+
+    # ---- Build libcxml ----
+    - name: Build libcxml (Windows)
+      run: |
+        # Create symlinks for ALL Boost libraries (MinGW uses -mt suffix)
+        echo "Creating Boost symlinks..."
+        cd /mingw64/lib
+        for f in libboost_*-mt.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.a/.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        for f in libboost_*-mt.dll.a; do
+          if [ -f "$f" ]; then
+            newname="${f/-mt.dll.a/.dll.a}"
+            ln -sf "$f" "$newname" 2>/dev/null || true
+          fi
+        done
+        echo "Boost symlinks created:"
+        ls -la libboost_system* libboost_filesystem* libboost_unit_test* 2>/dev/null || echo "Some libs missing"
+        cd -
+        
+        git clone https://github.com/cth103/libcxml.git libcxml
+        cd libcxml
+        
+        # Patch wscript for MinGW
+        sed -i "s/load('msvc')/load('g++')/g" wscript
+        sed -i 's/load("msvc")/load("g++")/g' wscript
+        sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
+        sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
+        python3 waf build
+        python3 waf install
+        
+        # Fallback: Create pkg-config file if it doesn't exist
+        if [ ! -f /mingw64/lib/pkgconfig/libcxml.pc ]; then
+          echo "Creating libcxml.pc manually..."
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libcxml.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "includedir=\${prefix}/include/libcxml" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Name: libcxml" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Description: Simple C++ wrapper for libxml++" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Version: 0.17.10" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Libs: -L\${libdir} -lcxml" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libcxml.pc
+          echo "Created libcxml.pc"
+        fi
+
+    # ---- Install fast_float ----
+    - name: Install fast_float (Windows)
+      run: |
+        git clone https://github.com/fastfloat/fast_float.git fast_float
+        cd fast_float
+        mkdir -p /mingw64/include/fast_float
+        cp -r include/fast_float/* /mingw64/include/fast_float/
+
+    # ---- Build libdcp with HDR Patch ----
+    - name: Build libdcp with HDR Patch (Windows)
+      run: |
+        # Create empty libdl.a (dl doesn't exist on Windows but libdcp checks for it)
+        ar rcs /mingw64/lib/libdl.a
+        
+        git clone https://github.com/cth103/libdcp.git libdcp
+        cd libdcp
+        git tag -f v1.10.0
+        patch -p1 < ../dcpomatic/libdcp_hdr_integration.patch
+        sed -i "s/load('msvc')/load('g++')/g" wscript
+        sed -i 's/load("msvc")/load("g++")/g' wscript
+        sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
+        sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        export CXX=g++.exe
+        export CC=gcc.exe
+        export AR=ar.exe
+        # Note: We rely on MinGW symlinks for Boost libraries, so no need to force -mt suffix here
+        
+        # Patch libdcp source for MinGW compilation errors
+        echo "Patching libdcp source..."
+        sed -i 's/_file = fopen(path.c_str()/_file = fopen(path.string().c_str()/' src/file.cc
+        sed -i 's/parser.parse(xml.c_str())/parser.parse(xml.string().c_str())/' src/verify.cc
+        # Fix WEXITSTATUS missing on Windows
+        sed -i '1i #ifdef _WIN32\n#ifndef WEXITSTATUS\n#define WEXITSTATUS(w) (w)\n#endif\n#endif' src/certificate_chain.cc
+        # Workaround for missing EDQUOT in MinGW
+        sed -i '1i #ifndef EDQUOT\n#define EDQUOT 122\n#endif' src/util.cc
+        
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        python3 waf configure --prefix=/mingw64 --disable-tests --disable-examples --disable-benchmarks --disable-dumpimage || (cat build/config.log && exit 1)
+        python3 waf build
+        python3 waf install
+        
+        # Fallback: Create pkg-config file for libdcp if needed
+        if [ ! -f /mingw64/lib/pkgconfig/libdcp-1.0.pc ]; then
+          echo "Creating libdcp-1.0.pc manually..."
+          mkdir -p /mingw64/lib/pkgconfig
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "includedir=\${prefix}/include/libdcp-1.0" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Name: libdcp" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Description: DCP-o-matic libdcp" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Version: 1.10.0" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Libs: -L\${libdir} -ldcp-1.0" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libdcp-1.0.pc
+          echo "Created libdcp-1.0.pc"
+        fi
+
+    # ---- Build libsub ----
+    - name: Build libsub (Windows)
+      run: |
+        git clone https://github.com/cth103/libsub.git libsub
+        cd libsub
+        git tag -f v1.6.58
+        sed -i "s/load('msvc')/load('g++')/g" wscript
+        sed -i 's/load("msvc")/load("g++")/g' wscript
+        sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
+        sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        export CXX=g++.exe
+        export LIBPATH=/mingw64/lib
+        # Workaround: waf check fails because ld can't find libraries in absolute paths if passed via -l
+        # (matching -lboost_regex), and add it to search path.
+        
+        echo "Downgrading boost to 1.85.0 to ensure regex lib exists (latest might be broken)..."
+        # Remove current boost
+        pacman -R --noconfirm mingw-w64-x86_64-boost || true
+        # Install specific version cache or download
+        wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
+        
+        # Manual extraction (since pacman installation seems to lose files or conflict)
+        echo "Manually extracting boost package..."
+        zstd -d mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst
+        tar xf mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar
+        
+        # Pacman install for dependencies but ignore file conflicts if any (we extracted manually)
+        # pacman -U --noconfirm --overwrite '*' mingw-w64-x86_64-boost-1.85.0-1-any.pkg.tar.zst || true
+        # Actually, let's skip pacman install of this package to avoid 'missing files' logic if pacman cleans up.
+        # We rely on our extracted files being present in current dir structure, but we need to move them to /mingw64
+        
+        echo "Moving extracted files to /mingw64..."
+        # The package structure starts with mingw64/
+        cp -r mingw64/* /mingw64/
+        
+        mkdir -p local_lib
+        echo "Looking for boost_regex library in extracted package..."
+        
+        # Check if it exists in the extracted dir first
+        LOCAL_REGEX=$(find mingw64/lib -name "libboost_regex*-mt.a" | head -n 1)
+        if [ -z "$LOCAL_REGEX" ]; then
+             echo "ERROR: Regex lib not found even in extracted package!"
+             ls -R mingw64/lib | grep regex || echo "No regex files found in package"
+        else
+             echo "Found regex in package: $LOCAL_REGEX"
+             cp "$LOCAL_REGEX" local_lib/libboost_regex.a
+        fi
+        
+        # Also let Python look in system dir just in case
+        if [ ! -f local_lib/libboost_regex.a ]; then
+            echo "Looking for boost_regex library using Python (system dir)..."
+            REGEX_PATH=$(python3 -c "import glob; \
+            libs = glob.glob('/mingw64/lib/libboost_regex*-mt.a'); \
+            libs = [l for l in libs if '.dll.a' not in l]; \
+            print(libs[0] if libs else '')")
+            
+            if [ ! -z "$REGEX_PATH" ]; then
+                cp "$REGEX_PATH" local_lib/libboost_regex.a
+            fi
+        fi
+        
+        # If still not found, try dll.a from extracted dir
+        if [ ! -f local_lib/libboost_regex.a ]; then
+             LOCAL_REGEX_DLL=$(find mingw64/lib -name "libboost_regex*.dll.a" | head -n 1)
+             if [ ! -z "$LOCAL_REGEX_DLL" ]; then
+                  cp "$LOCAL_REGEX_DLL" local_lib/libboost_regex.dll.a
+             fi
+        fi
+        
+        LOCAL_LIB_PATH="$(pwd)/local_lib"
+        export LINKFLAGS="-L/mingw64/lib -L$LOCAL_LIB_PATH"
+
+        # Re-verify/create dummy boost_system
+        if [ ! -f /mingw64/lib/libboost_system.a ]; then
+            echo "Creating dummy libboost_system.a again..."
+            echo "" > dummy.c
+            gcc -c dummy.c -o dummy.o
+            ar rc /mingw64/lib/libboost_system.a dummy.o
+            ranlib /mingw64/lib/libboost_system.a
+        fi
+        
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        export CXXFLAGS="-DBOOST_SYSTEM_NO_DEPRECATED"
+        
+        python3 waf configure --prefix=/mingw64 || (cat build/config.log && exit 1)
+        
+        # For build, we still need the regex lib (waf might use -lboost_regex if check passed)
+        # Our LINKFLAGS already has -Llocal_lib, so it should find libboost_regex.a
+        python3 waf build
+        python3 waf install
+        
+        # Fallback for libsub pc
+        if [ ! -f /mingw64/lib/pkgconfig/libsub-1.0.pc ]; then
+          echo "Creating libsub-1.0.pc manually..."
+          mkdir -p /mingw64/lib/pkgconfig
+          echo "prefix=/mingw64" > /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "exec_prefix=\${prefix}" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "libdir=\${exec_prefix}/lib" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "includedir=\${prefix}/include/libsub-1.0" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Name: libsub" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Description: DCP-o-matic libsub" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Version: 1.6.58" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Libs: -L\${libdir} -lsub-1.0" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Cflags: -I\${includedir}" >> /mingw64/lib/pkgconfig/libsub-1.0.pc
+          echo "Created libsub-1.0.pc"
+        fi
+
+    # ---- Build leqm-nrt ----
+    - name: Build leqm-nrt (Windows)
+      run: |
+        git clone https://github.com/cth103/leqm-nrt.git leqm-nrt
+        cd leqm-nrt
+        git checkout d75d0af984d9c14bfefca8f1bdbc215c3bf3a388
+        cp ../dcpomatic/waf .
+        sed -i "s/load('msvc')/load('g++')/g" wscript
+        sed -i 's/load("msvc")/load("g++")/g' wscript
+        sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
+        sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        export CXX=g++.exe
+        export CC=gcc.exe
+        export AR=ar.exe
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        python3 waf configure --prefix=/mingw64
+        python3 waf build
+        python3 waf install
+
+    # ---- Setup ONNX Runtime ----
+    - name: Setup ONNX Runtime (Windows)
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}.zip" -OutFile "onnxruntime.zip"
+        Expand-Archive -Path onnxruntime.zip -DestinationPath .
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\include\*" -Destination "C:\msys64\mingw64\include\" -Recurse -Force
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib\*" -Destination "C:\msys64\mingw64\lib\" -Recurse -Force
+        New-Item -ItemType Directory -Force -Path "dcpomatic\deps\onnxruntime"
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\include" -Destination "dcpomatic\deps\onnxruntime\" -Recurse
+        Copy-Item -Path "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib" -Destination "dcpomatic\deps\onnxruntime\" -Recurse
+
+    # ---- Build DCP-o-matic ----
+    - name: Configure and Build DCP-o-matic (Windows)
+      run: |
+        cd dcpomatic
+        sed -i "s/load('msvc')/load('g++')/g" wscript
+        sed -i 's/load("msvc")/load("g++")/g' wscript
+        sed -i "s/load('compiler_cxx')/load('g++')/g" wscript
+        sed -i "s/load('compiler_c')/load('gcc')/g" wscript
+        export CXX=g++.exe
+        export CC=gcc.exe
+        export AR=ar.exe
+        sed -i "s/lib='boost_system/lib='boost_system-mt/g" wscript
+        sed -i "s/lib='boost_filesystem/lib='boost_filesystem-mt/g" wscript
+        sed -i "s/lib='boost_date_time/lib='boost_date_time-mt/g" wscript
+        sed -i "s/lib='boost_thread/lib='boost_thread-mt/g" wscript
+        sed -i "s/lib='boost_regex/lib='boost_regex-mt/g" wscript
+        export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:$PKG_CONFIG_PATH
+        python3 waf configure --prefix=/mingw64 --disable-tests --enable-leqm-nrt
+        python3 waf build -j$(nproc)
+
+    - name: Package Windows Build
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path artifacts\windows
+        Copy-Item dcpomatic\build\src\tools\*.exe artifacts\windows\
+        Copy-Item "onnxruntime-win-x64-${{ env.ONNXRUNTIME_VERSION }}\lib\*.dll" artifacts\windows\
+        Compress-Archive -Path artifacts\windows\* -DestinationPath artifacts\dcpomatic-neural-hdr-win-x64.zip
+
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcpomatic-neural-hdr-win-x64
+        path: artifacts/dcpomatic-neural-hdr-win-x64.zip
